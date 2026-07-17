@@ -908,10 +908,12 @@
           }
 
           // If signing up as a worker, also create their workers row
+          // (name is duplicated here on purpose — see security-migration.sql:
+          // the public worker directory reads from `workers`, never `profiles`)
           if(selectedRole === 'worker'){
             const { error: workerErr } = await supabaseClient
               .from('workers')
-              .insert({ profile_id: profile.id, category: 'General' });
+              .insert({ profile_id: profile.id, category: 'General', name: userName });
             if(workerErr) throw workerErr;
           }
 
@@ -923,15 +925,13 @@
               : "Account created as a customer. You can start searching for workers nearby right away.";
 
         } else {
-          // Login — look up existing profile by phone + role
-          const { data: profile, error: findErr } = await supabaseClient
-            .from('profiles')
-            .select('*')
-            .eq('phone', phoneVal)
-            .eq('role', selectedRole)
-            .maybeSingle();
+          // Login — via a controlled RPC instead of reading the profiles
+          // table directly (that table has no public read access anymore).
+          const { data: rows, error: findErr } = await supabaseClient
+            .rpc('login_lookup', { p_phone: phoneVal, p_role: selectedRole });
 
           if(findErr) throw findErr;
+          const profile = rows && rows.length ? rows[0] : null;
           if(!profile){
             throw new Error('No ' + selectedRole + ' account found with that phone number. Try signing up instead.');
           }

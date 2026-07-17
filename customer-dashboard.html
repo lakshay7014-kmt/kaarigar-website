@@ -345,12 +345,12 @@
   async function loadWorkers(){
     const { data, error } = await supabaseClient
       .from('workers')
-      .select('id, category, bio, rating, jobs_completed, is_online, profiles(name), services(id, name, price)')
+      .select('id, name, category, bio, rating, jobs_completed, is_online, services(id, name, price)')
       .order('rating', { ascending: false });
     if(error){ console.error(error); return; }
     workers = (data || []).map(w => ({
       id: w.id,
-      name: w.profiles ? w.profiles.name : 'Worker',
+      name: w.name || 'Worker',
       cat: w.category,
       skill: w.category + (w.bio ? ' — ' + w.bio : ''),
       rating: w.rating,
@@ -363,28 +363,23 @@
   }
 
   async function loadBookings(){
-    const { data, error } = await supabaseClient
-      .from('bookings')
-      .select('id, service_name, price, status, created_at, workers(category, profiles(name))')
-      .eq('customer_id', uid)
-      .order('created_at', { ascending: false });
+    // Goes through a controlled RPC — the bookings table itself has no
+    // public read access (see security-migration.sql).
+    const { data, error } = await supabaseClient.rpc('get_my_bookings', { p_customer_id: uid });
     if(error){ console.error(error); return; }
     bookings = (data || []).map(b => ({
       id: b.id,
-      workerName: b.workers && b.workers.profiles ? b.workers.profiles.name : 'Worker',
+      workerName: b.worker_name || 'Worker',
       skill: b.service_name,
       status: b.status,
       price: b.price,
       date: new Date(b.created_at).toLocaleString('en-IN', {day:'numeric', month:'short', hour:'numeric', minute:'2-digit'}),
-      ...styleFor(b.workers ? b.workers.category : 'General')
+      ...styleFor(b.worker_category || 'General')
     }));
   }
 
   async function loadFavorites(){
-    const { data, error } = await supabaseClient
-      .from('favorites')
-      .select('worker_id')
-      .eq('customer_id', uid);
+    const { data, error } = await supabaseClient.rpc('get_my_favorites', { p_customer_id: uid });
     if(error){ console.error(error); return; }
     favoriteIds = new Set((data || []).map(f => f.worker_id));
   }
@@ -439,13 +434,12 @@
     scope.querySelectorAll('[data-fav]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.dataset.fav;
-        if(favoriteIds.has(id)){
-          await supabaseClient.from('favorites').delete().eq('customer_id', uid).eq('worker_id', id);
-          favoriteIds.delete(id);
-        } else {
-          await supabaseClient.from('favorites').insert({ customer_id: uid, worker_id: id });
-          favoriteIds.add(id);
-        }
+        const wasFav = favoriteIds.has(id);
+        const { error } = await supabaseClient.rpc('toggle_favorite', {
+          p_customer_id: uid, p_worker_id: id, p_add: !wasFav
+        });
+        if(error){ console.error(error); return; }
+        wasFav ? favoriteIds.delete(id) : favoriteIds.add(id);
         renderWorkerGrid();
         renderFavorites();
       });
@@ -489,7 +483,9 @@
 
     list.querySelectorAll('[data-cancel]').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const { error } = await supabaseClient.from('bookings').update({ status: 'cancelled' }).eq('id', btn.dataset.cancel);
+        const { error } = await supabaseClient.rpc('update_booking_status', {
+          p_booking_id: btn.dataset.cancel, p_actor_profile_id: uid, p_new_status: 'cancelled'
+        });
         if(!error){
           const b = bookings.find(x => x.id === btn.dataset.cancel);
           if(b) b.status = 'cancelled';
