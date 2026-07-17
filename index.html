@@ -631,6 +631,27 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // ============================================================
+  // BACKEND CONFIG — replace these two values with your own
+  // Supabase project's URL and "anon public" key
+  // (Supabase dashboard → Project Settings → API)
+  // ============================================================
+  const SUPABASE_URL = 'https://wbygseregfnudvuhxklb.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndieWdzZXJlZ2ZudWR2dWh4a2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyNTc3NjIsImV4cCI6MjA5OTgzMzc2Mn0.6VlGmBR1nt0CXPClMDRgbtTiVfPl7cim2rgEvkl23Fs';
+  const BACKEND_READY = SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY';
+  const supabaseClient = BACKEND_READY ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+  if(!BACKEND_READY){
+    document.addEventListener('DOMContentLoaded', () => {
+      const bar = document.createElement('div');
+      bar.style.cssText = 'background:#BF3B2C;color:#fff;text-align:center;font-size:0.82rem;padding:8px 16px;font-family:sans-serif;';
+      bar.textContent = '⚠️ Backend not connected yet — add your Supabase URL & key at the top of index.html to enable real signup/login.';
+      document.body.prepend(bar);
+    });
+  }
+</script>
 <script>
   (function(){
     // ---------- Mobile nav ----------
@@ -843,38 +864,102 @@
       // In production: re-trigger OTP send API call here.
     });
 
-    // Verify OTP (mock — accepts any 4 digits since there's no backend yet)
-    document.getElementById('verifyOtpBtn').addEventListener('click', () => {
+    // Verify OTP — code itself is still mocked (no real SMS yet, see the
+    // yellow banner above) but once "verified", we now do a REAL signup or
+    // login against the Supabase database.
+    let currentProfile = null;
+
+    document.getElementById('verifyOtpBtn').addEventListener('click', async () => {
       const code = Array.from(otpDigits).map(i => i.value).join('');
       const errorEl = document.getElementById('otpError');
       if(code.length !== 4){
         errorEl.classList.add('show');
+        errorEl.textContent = 'Enter all 4 digits.';
         return;
       }
       errorEl.classList.remove('show');
 
-      if(mode === 'login'){
-        document.getElementById('successTitle').textContent = 'Welcome back!';
-        document.getElementById('successSub').textContent = "You're logged in.";
-      } else {
-        document.getElementById('successTitle').textContent = 'You\'re in, ' + (userName || 'there') + '!';
-        document.getElementById('successSub').textContent =
-          selectedRole === 'worker'
-            ? "Account created as a worker. Next, you'll set up your board — skills, prices, and photos."
-            : "Account created as a customer. You can start searching for workers nearby right away.";
+      if(!BACKEND_READY){
+        errorEl.textContent = 'Backend not connected yet — add your Supabase URL & key at the top of index.html.';
+        errorEl.classList.add('show');
+        return;
       }
-      showStep('success');
+
+      const verifyBtn = document.getElementById('verifyOtpBtn');
+      verifyBtn.disabled = true;
+      verifyBtn.textContent = 'Please wait…';
+
+      const phoneVal = document.getElementById('phoneInput').value.trim();
+
+      try{
+        if(mode === 'signup'){
+          // Create the profile row
+          const { data: profile, error: profileErr } = await supabaseClient
+            .from('profiles')
+            .insert({ name: userName, age: Number(userAge), phone: phoneVal, role: selectedRole })
+            .select()
+            .single();
+
+          if(profileErr){
+            if(profileErr.code === '23505'){ // unique violation on phone
+              throw new Error('This phone number is already registered. Try logging in instead.');
+            }
+            throw profileErr;
+          }
+
+          // If signing up as a worker, also create their workers row
+          if(selectedRole === 'worker'){
+            const { error: workerErr } = await supabaseClient
+              .from('workers')
+              .insert({ profile_id: profile.id, category: 'General' });
+            if(workerErr) throw workerErr;
+          }
+
+          currentProfile = profile;
+          document.getElementById('successTitle').textContent = 'You\'re in, ' + (userName || 'there') + '!';
+          document.getElementById('successSub').textContent =
+            selectedRole === 'worker'
+              ? "Account created as a worker. Next, you'll set up your board — skills, prices, and photos."
+              : "Account created as a customer. You can start searching for workers nearby right away.";
+
+        } else {
+          // Login — look up existing profile by phone + role
+          const { data: profile, error: findErr } = await supabaseClient
+            .from('profiles')
+            .select('*')
+            .eq('phone', phoneVal)
+            .eq('role', selectedRole)
+            .maybeSingle();
+
+          if(findErr) throw findErr;
+          if(!profile){
+            throw new Error('No ' + selectedRole + ' account found with that phone number. Try signing up instead.');
+          }
+
+          currentProfile = profile;
+          document.getElementById('successTitle').textContent = 'Welcome back, ' + profile.name + '!';
+          document.getElementById('successSub').textContent = "You're logged in.";
+        }
+
+        showStep('success');
+      } catch(err){
+        errorEl.textContent = err.message || 'Something went wrong. Please try again.';
+        errorEl.classList.add('show');
+      } finally {
+        verifyBtn.disabled = false;
+        verifyBtn.textContent = 'Verify & continue';
+      }
     });
 
-    // For the login flow (no role step shown), default to customer dashboard
-    // unless a real backend tells us otherwise — this is only a prototype.
-    // Name/age are passed along as URL params purely for demo personalization,
-    // since there's no real backend/session to persist them yet.
+    // Redirect to the correct real dashboard, passing the real profile id
+    // so the dashboard can fetch this person's actual data from Supabase.
     document.getElementById('successDone').addEventListener('click', () => {
       const target = selectedRole === 'worker' ? 'worker-dashboard.html' : 'customer-dashboard.html';
       const params = new URLSearchParams();
-      if(userName) params.set('name', userName);
-      if(userAge) params.set('age', userAge);
+      if(currentProfile){
+        params.set('uid', currentProfile.id);
+        params.set('name', currentProfile.name);
+      }
       const qs = params.toString();
       window.location.href = target + (qs ? '?' + qs : '');
     });

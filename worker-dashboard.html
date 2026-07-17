@@ -241,25 +241,96 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // ============================================================
+  // BACKEND CONFIG — must match the values you put in index.html
+  // ============================================================
+  const SUPABASE_URL = 'https://wbygseregfnudvuhxklb.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndieWdzZXJlZ2ZudWR2dWh4a2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyNTc3NjIsImV4cCI6MjA5OTgzMzc2Mn0.6VlGmBR1nt0CXPClMDRgbtTiVfPl7cim2rgEvkl23Fs';
+  const BACKEND_READY = SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY';
+  const supabaseClient = BACKEND_READY ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+</script>
 <script>
 (function(){
-  // ---------- Mock data ----------
-  let requests = [
-    {id:1, customer:'Priya Mehta', initial:'P', skill:'AC Repair', date:'Today, 4:00 PM', price:499, address:'Sector 12, 0.8 km away'},
-    {id:2, customer:'Karan Verma', initial:'K', skill:'AC Repair — installation check', date:'Tomorrow, 11:00 AM', price:499, address:'Sector 15, 2.1 km away'},
-  ];
+  // ---------- Auth gate: this page needs a real logged-in worker ----------
+  const urlParams = new URLSearchParams(window.location.search);
+  const profileUid = urlParams.get('uid');
+  const paramName = urlParams.get('name');
 
-  let workerBookings = [
-    {id:201, customer:'Anjali Rao', skill:'AC Repair', date:'18 Jul, 2:00 PM', status:'accepted', price:499},
-    {id:202, customer:'Suresh Nair', skill:'AC Repair', date:'10 Jul, 5:00 PM', status:'completed', price:499},
-    {id:203, customer:'Deepa Iyer', skill:'AC Repair', date:'5 Jul, 3:00 PM', status:'completed', price:399},
-  ];
+  if(!BACKEND_READY){
+    document.querySelector('.content').innerHTML =
+      '<div class="empty-state"><div class="e-icon">⚠️</div><p>Backend not connected yet — add your Supabase URL & key at the top of worker-dashboard.html.</p></div>';
+    return;
+  }
+  if(!profileUid){
+    document.querySelector('.content').innerHTML =
+      '<div class="empty-state"><div class="e-icon">🔒</div><p>You need to log in to see your dashboard.</p><br><a href="index.html" class="ghost-btn" style="text-decoration:none;">Go to login</a></div>';
+    return;
+  }
+  if(paramName){
+    document.getElementById('greetingName').textContent = 'Namaste, ' + paramName + ' 👋';
+    document.querySelector('.avatar').textContent = paramName.charAt(0).toUpperCase();
+  }
 
-  let services = [
-    {id:1, icon:'❄️', name:'AC Gas Refill', price:'₹499'},
-    {id:2, icon:'🔌', name:'AC Installation', price:'₹899'},
-    {id:3, icon:'🧹', name:'AC Service & Cleaning', price:'₹349'},
-  ];
+  // ---------- State ----------
+  let workerRow = null;    // this worker's own row in the `workers` table
+  let requests = [];       // pending bookings needing accept/decline
+  let workerBookings = []; // accepted/completed bookings
+  let services = [];
+
+  // ---------- Data loading ----------
+  async function loadWorkerRow(){
+    const { data, error } = await supabaseClient
+      .from('workers')
+      .select('id, category, bio, rating, jobs_completed, is_online')
+      .eq('profile_id', profileUid)
+      .maybeSingle();
+    if(error){ console.error(error); return; }
+    workerRow = data;
+    if(workerRow){
+      const isOn = workerRow.is_online;
+      statusSwitch.classList.toggle('on', isOn);
+      statusDot.classList.toggle('online', isOn);
+      statusLabelEl.textContent = isOn ? 'Online' : 'Offline';
+      document.querySelectorAll('.stat-value')[1].textContent = workerRow.jobs_completed;
+      document.querySelectorAll('.stat-value')[2].textContent = Number(workerRow.rating).toFixed(1) + ' ⭐';
+    }
+  }
+
+  async function loadBookings(){
+    if(!workerRow) return;
+    const { data, error } = await supabaseClient
+      .from('bookings')
+      .select('id, service_name, price, status, created_at, profiles(name)')
+      .eq('worker_id', workerRow.id)
+      .order('created_at', { ascending: false });
+    if(error){ console.error(error); return; }
+
+    const rows = (data || []).map(b => ({
+      id: b.id,
+      customer: b.profiles ? b.profiles.name : 'Customer',
+      initial: (b.profiles ? b.profiles.name : 'C').charAt(0).toUpperCase(),
+      skill: b.service_name,
+      price: b.price,
+      status: b.status,
+      date: new Date(b.created_at).toLocaleString('en-IN', {day:'numeric', month:'short', hour:'numeric', minute:'2-digit'}),
+      address: 'Address shared after accepting'
+    }));
+
+    requests = rows.filter(r => r.status === 'pending');
+    workerBookings = rows.filter(r => r.status === 'accepted' || r.status === 'completed');
+  }
+
+  async function loadServices(){
+    if(!workerRow) return;
+    const { data, error } = await supabaseClient
+      .from('services')
+      .select('id, name, price')
+      .eq('worker_id', workerRow.id);
+    if(error){ console.error(error); return; }
+    services = (data || []).map(s => ({ id: s.id, icon: '🧰', name: s.name, price: '₹' + s.price }));
+  }
 
   function updateReqCount(){
     document.getElementById('reqCount').textContent = requests.length;
@@ -294,11 +365,14 @@
 
   function attachRequestHandlers(){
     document.querySelectorAll('[data-accept]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = Number(btn.dataset.accept);
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.accept;
+        const { error } = await supabaseClient.from('bookings').update({ status: 'accepted' }).eq('id', id);
+        if(error){ alert('Could not accept: ' + error.message); return; }
         const r = requests.find(x => x.id === id);
         if(r){
-          workerBookings.unshift({id: Date.now(), customer: r.customer, skill: r.skill, date: r.date, status: 'accepted', price: r.price});
+          r.status = 'accepted';
+          workerBookings.unshift(r);
           requests = requests.filter(x => x.id !== id);
           renderRequests();
           renderWorkerBookings();
@@ -306,8 +380,11 @@
       });
     });
     document.querySelectorAll('[data-decline]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        requests = requests.filter(x => x.id !== Number(btn.dataset.decline));
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.decline;
+        const { error } = await supabaseClient.from('bookings').update({ status: 'cancelled' }).eq('id', id);
+        if(error){ alert('Could not decline: ' + error.message); return; }
+        requests = requests.filter(x => x.id !== id);
         renderRequests();
       });
     });
@@ -317,7 +394,7 @@
   function bookingRow(b){
     return `
       <div class="request-card">
-        <div class="request-avatar" style="background:var(--teal);">${b.customer.charAt(0)}</div>
+        <div class="request-avatar" style="background:var(--teal);">${b.initial}</div>
         <div class="request-info">
           <strong>${b.customer}</strong>
           <span>${b.skill} · ${b.date} · ₹${b.price}</span>
@@ -337,8 +414,11 @@
       ? filtered.map(bookingRow).join('')
       : `<div class="empty-state"><div class="e-icon">📋</div><p>Nothing here yet.</p></div>`;
     list.querySelectorAll('[data-complete]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const b = workerBookings.find(x => x.id === Number(btn.dataset.complete));
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.complete;
+        const { error } = await supabaseClient.from('bookings').update({ status: 'completed' }).eq('id', id);
+        if(error){ alert('Could not update: ' + error.message); return; }
+        const b = workerBookings.find(x => x.id === id);
         if(b){ b.status = 'completed'; renderWorkerBookings(); }
       });
     });
@@ -353,7 +433,9 @@
       </div>`;
   }
   function renderServices(){
-    document.getElementById('serviceList').innerHTML = services.map(serviceRow).join('');
+    document.getElementById('serviceList').innerHTML = services.length
+      ? services.map(serviceRow).join('')
+      : '<p style="color:var(--ink-soft);font-size:0.9rem;">No services added yet — add your first one below.</p>';
   }
 
   // ---------- Sidebar nav ----------
@@ -374,10 +456,13 @@
   const statusSwitch = document.getElementById('statusSwitch');
   const statusDot = document.getElementById('statusDot');
   const statusLabelEl = document.getElementById('statusLabel');
-  statusSwitch.addEventListener('click', () => {
+  statusSwitch.addEventListener('click', async () => {
     const isOn = statusSwitch.classList.toggle('on');
     statusDot.classList.toggle('online', isOn);
     statusLabelEl.textContent = isOn ? 'Online' : 'Offline';
+    if(workerRow){
+      await supabaseClient.from('workers').update({ is_online: isOn }).eq('id', workerRow.id);
+    }
   });
 
   // ---------- Booking tabs ----------
@@ -390,27 +475,36 @@
     });
   });
 
-  // ---------- Add service (simple mock) ----------
-  document.getElementById('addServiceBtn').addEventListener('click', () => {
+  // ---------- Add service (writes a real row) ----------
+  document.getElementById('addServiceBtn').addEventListener('click', async () => {
+    if(!workerRow) return;
     const name = prompt('Service name (e.g. "Fan Repair"):');
     if(!name) return;
-    const price = prompt('Price (e.g. "₹299"):', '₹299');
-    services.push({id: Date.now(), icon: '🧰', name, price: price || '₹—'});
+    const priceStr = prompt('Price in ₹ (numbers only, e.g. 299):', '299');
+    const price = Number((priceStr || '0').replace(/[^\d.]/g, ''));
+    const { data, error } = await supabaseClient
+      .from('services')
+      .insert({ worker_id: workerRow.id, name, price })
+      .select()
+      .single();
+    if(error){ alert('Could not add service: ' + error.message); return; }
+    services.push({ id: data.id, icon: '🧰', name: data.name, price: '₹' + data.price });
     renderServices();
   });
 
-  // ---------- Personalize greeting from signup/login (demo only — no real session) ----------
-  const urlParams = new URLSearchParams(window.location.search);
-  const paramName = urlParams.get('name');
-  if(paramName){
-    document.getElementById('greetingName').textContent = 'Namaste, ' + paramName + ' 👋';
-    document.querySelector('.avatar').textContent = paramName.charAt(0).toUpperCase();
-  }
-
   // ---------- Init ----------
-  renderRequests();
-  renderWorkerBookings();
-  renderServices();
+  (async function init(){
+    await loadWorkerRow();
+    if(!workerRow){
+      document.querySelector('.content').innerHTML =
+        '<div class="empty-state"><div class="e-icon">⚠️</div><p>No worker profile found for this account.</p></div>';
+      return;
+    }
+    await Promise.all([loadBookings(), loadServices()]);
+    renderRequests();
+    renderWorkerBookings();
+    renderServices();
+  })();
 })();
 </script>
 </body>

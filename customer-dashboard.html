@@ -289,34 +289,109 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // ============================================================
+  // BACKEND CONFIG — must match the values you put in index.html
+  // ============================================================
+  const SUPABASE_URL = 'https://wbygseregfnudvuhxklb.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndieWdzZXJlZ2ZudWR2dWh4a2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyNTc3NjIsImV4cCI6MjA5OTgzMzc2Mn0.6VlGmBR1nt0CXPClMDRgbtTiVfPl7cim2rgEvkl23Fs';
+  const BACKEND_READY = SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY';
+  const supabaseClient = BACKEND_READY ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+</script>
 <script>
 (function(){
-  // ---------- Mock data (in-memory only, no backend / no localStorage) ----------
-  const workers = [
-    {id:1, name:'Ramesh Kumar', skill:'AC Repair', cat:'AC Repair', icon:'❄️', color:'var(--teal)', rating:4.9, distance:'0.8 km', price:499, jobs:212},
-    {id:2, name:'Sunita Devi', skill:'Tailoring — Blouse & Alterations', cat:'Tailoring', icon:'✂️', color:'var(--mustard)', rating:4.8, distance:'1.1 km', price:250, jobs:340},
-    {id:3, name:'Vikram Singh', skill:'Electrician', cat:'Electrician', icon:'⚡', color:'var(--signal)', rating:4.7, distance:'1.4 km', price:350, jobs:190},
-    {id:4, name:'Anita Sharma', skill:'Maths & Science Tutor', cat:'Tutoring', icon:'📘', color:'var(--leaf)', rating:5.0, distance:'0.6 km', price:400, jobs:88},
-    {id:5, name:'Meena Kaushik', skill:'Home Cook — North Indian Tiffin', cat:'Cooking', icon:'🍲', color:'var(--rose)', rating:4.6, distance:'2.0 km', price:150, jobs:410},
-    {id:6, name:'Pooja Beauty Studio', skill:'Beautician — Home Service', cat:'Beautician', icon:'💇', color:'var(--navy)', rating:4.8, distance:'1.7 km', price:600, jobs:265},
-    {id:7, name:'Amit Plumbing Works', skill:'Plumbing', cat:'Plumbing', icon:'🔧', color:'var(--teal)', rating:4.5, distance:'2.3 km', price:300, jobs:150},
-    {id:8, name:'Rekha Tailors', skill:'Tailoring — Custom Stitching', cat:'Tailoring', icon:'✂️', color:'var(--mustard)', rating:4.9, distance:'1.9 km', price:280, jobs:520},
-  ];
+  const CATEGORY_STYLE = {
+    'AC Repair': {icon:'❄️', color:'var(--teal)'},
+    'Tailoring': {icon:'✂️', color:'var(--mustard)'},
+    'Electrician': {icon:'⚡', color:'var(--signal)'},
+    'Tutoring': {icon:'📘', color:'var(--leaf)'},
+    'Cooking': {icon:'🍲', color:'var(--rose)'},
+    'Beautician': {icon:'💇', color:'var(--navy)'},
+    'Plumbing': {icon:'🔧', color:'var(--teal)'},
+    'General': {icon:'🧰', color:'var(--ink-soft)'}
+  };
+  function styleFor(cat){ return CATEGORY_STYLE[cat] || {icon:'🧰', color:'var(--ink-soft)'}; }
 
-  let bookings = [
-    {id:101, workerName:'Ramesh Kumar', skill:'AC Repair', icon:'❄️', color:'var(--teal)', date:'20 Jul, 4:00 PM', status:'accepted', price:499},
-    {id:102, workerName:'Anita Sharma', skill:'Maths Tutoring', icon:'📘', color:'var(--leaf)', date:'15 Jul, 6:00 PM', status:'completed', price:400},
-    {id:103, workerName:'Vikram Singh', skill:'Electrician', icon:'⚡', color:'var(--signal)', date:'12 Jul, 11:00 AM', status:'cancelled', price:350},
-  ];
+  // ---------- Auth gate: this page needs a real logged-in customer ----------
+  const urlParams = new URLSearchParams(window.location.search);
+  const uid = urlParams.get('uid');
+  const paramName = urlParams.get('name');
 
-  let favorites = new Set([2, 4]);
+  if(!BACKEND_READY){
+    document.querySelector('.content').innerHTML =
+      '<div class="empty-state"><div class="e-icon">⚠️</div><p>Backend not connected yet — add your Supabase URL & key at the top of customer-dashboard.html.</p></div>';
+    return;
+  }
+  if(!uid){
+    document.querySelector('.content').innerHTML =
+      '<div class="empty-state"><div class="e-icon">🔒</div><p>You need to log in to see your dashboard.</p><br><a href="index.html" class="ghost-btn" style="text-decoration:none;">Go to login</a></div>';
+    return;
+  }
+  if(paramName){
+    document.getElementById('greetingName').textContent = 'Namaste, ' + paramName + ' 👋';
+    document.querySelector('.avatar').textContent = paramName.charAt(0).toUpperCase();
+  }
+
+  // ---------- State ----------
+  let workers = [];       // real rows from Supabase, joined with profile + services
+  let bookings = [];
+  let favoriteIds = new Set();
   let activeCategory = 'all';
   let searchQuery = '';
   let pendingBookWorker = null;
 
+  // ---------- Data loading ----------
+  async function loadWorkers(){
+    const { data, error } = await supabaseClient
+      .from('workers')
+      .select('id, category, bio, rating, jobs_completed, is_online, profiles(name), services(id, name, price)')
+      .order('rating', { ascending: false });
+    if(error){ console.error(error); return; }
+    workers = (data || []).map(w => ({
+      id: w.id,
+      name: w.profiles ? w.profiles.name : 'Worker',
+      cat: w.category,
+      skill: w.category + (w.bio ? ' — ' + w.bio : ''),
+      rating: w.rating,
+      jobs: w.jobs_completed,
+      online: w.is_online,
+      price: (w.services && w.services.length) ? Math.min(...w.services.map(s => s.price)) : 0,
+      serviceName: (w.services && w.services.length) ? w.services[0].name : w.category,
+      ...styleFor(w.category)
+    }));
+  }
+
+  async function loadBookings(){
+    const { data, error } = await supabaseClient
+      .from('bookings')
+      .select('id, service_name, price, status, created_at, workers(category, profiles(name))')
+      .eq('customer_id', uid)
+      .order('created_at', { ascending: false });
+    if(error){ console.error(error); return; }
+    bookings = (data || []).map(b => ({
+      id: b.id,
+      workerName: b.workers && b.workers.profiles ? b.workers.profiles.name : 'Worker',
+      skill: b.service_name,
+      status: b.status,
+      price: b.price,
+      date: new Date(b.created_at).toLocaleString('en-IN', {day:'numeric', month:'short', hour:'numeric', minute:'2-digit'}),
+      ...styleFor(b.workers ? b.workers.category : 'General')
+    }));
+  }
+
+  async function loadFavorites(){
+    const { data, error } = await supabaseClient
+      .from('favorites')
+      .select('worker_id')
+      .eq('customer_id', uid);
+    if(error){ console.error(error); return; }
+    favoriteIds = new Set((data || []).map(f => f.worker_id));
+  }
+
   // ---------- Rendering ----------
   function workerCard(w){
-    const isFav = favorites.has(w.id);
+    const isFav = favoriteIds.has(w.id);
     return `
       <div class="worker-card">
         <button class="fav-btn ${isFav?'active':''}" data-fav="${w.id}">${isFav ? '♥' : '♡'}</button>
@@ -328,9 +403,9 @@
           </div>
         </div>
         <div class="worker-meta">
-          <span>⭐ ${w.rating}</span>
-          <span>📍 ${w.distance}</span>
+          <span>⭐ ${Number(w.rating).toFixed(1)}</span>
           <span>✅ ${w.jobs} jobs</span>
+          <span>${w.online ? '🟢 Online' : '⚪ Offline'}</span>
         </div>
         <div class="worker-footer">
           <div class="worker-price">₹${w.price}<span style="color:var(--ink-soft);font-weight:400;">/visit</span></div>
@@ -353,7 +428,7 @@
 
   function renderFavorites(){
     const grid = document.getElementById('favoritesGrid');
-    const favWorkers = workers.filter(w => favorites.has(w.id));
+    const favWorkers = workers.filter(w => favoriteIds.has(w.id));
     grid.innerHTML = favWorkers.length
       ? favWorkers.map(workerCard).join('')
       : '<div class="empty-state" style="grid-column:1/-1;"><div class="e-icon">❤️</div><p>Workers you save will show up here.</p></div>';
@@ -362,15 +437,21 @@
 
   function attachCardHandlers(scope){
     scope.querySelectorAll('[data-fav]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = Number(btn.dataset.fav);
-        favorites.has(id) ? favorites.delete(id) : favorites.add(id);
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.fav;
+        if(favoriteIds.has(id)){
+          await supabaseClient.from('favorites').delete().eq('customer_id', uid).eq('worker_id', id);
+          favoriteIds.delete(id);
+        } else {
+          await supabaseClient.from('favorites').insert({ customer_id: uid, worker_id: id });
+          favoriteIds.add(id);
+        }
         renderWorkerGrid();
         renderFavorites();
       });
     });
     scope.querySelectorAll('[data-book]').forEach(btn => {
-      btn.addEventListener('click', () => openBookModal(Number(btn.dataset.book)));
+      btn.addEventListener('click', () => openBookModal(btn.dataset.book));
     });
   }
 
@@ -407,9 +488,13 @@
       : `<div class="empty-state"><div class="e-icon">📋</div><p>No ${activeBookingTab} bookings yet.</p></div>`;
 
     list.querySelectorAll('[data-cancel]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const b = bookings.find(x => x.id === Number(btn.dataset.cancel));
-        if(b){ b.status = 'cancelled'; renderBookings(); }
+      btn.addEventListener('click', async () => {
+        const { error } = await supabaseClient.from('bookings').update({ status: 'cancelled' }).eq('id', btn.dataset.cancel);
+        if(!error){
+          const b = bookings.find(x => x.id === btn.dataset.cancel);
+          if(b) b.status = 'cancelled';
+          renderBookings();
+        }
       });
     });
   }
@@ -466,12 +551,29 @@
   document.getElementById('bookModalClose').addEventListener('click', () => bookModal.classList.remove('open'));
   bookModal.addEventListener('click', (e) => { if(e.target === bookModal) bookModal.classList.remove('open'); });
 
-  document.getElementById('confirmBookBtn').addEventListener('click', () => {
-    // In production: create booking via API, then initiate Razorpay escrow payment.
+  document.getElementById('confirmBookBtn').addEventListener('click', async () => {
+    // NOTE: this creates a real booking row. Payment is not wired up yet —
+    // that's Phase 3 (Razorpay), once you're ready to set up a business account.
+    const note = document.getElementById('bookNote').value.trim();
+    const { data, error } = await supabaseClient
+      .from('bookings')
+      .insert({
+        customer_id: uid,
+        worker_id: pendingBookWorker.id,
+        service_name: pendingBookWorker.serviceName,
+        price: pendingBookWorker.price,
+        status: 'pending',
+        scheduled_note: note
+      })
+      .select()
+      .single();
+
+    if(error){ alert('Could not create booking: ' + error.message); return; }
+
     bookings.unshift({
-      id: Date.now(),
+      id: data.id,
       workerName: pendingBookWorker.name,
-      skill: pendingBookWorker.skill,
+      skill: pendingBookWorker.serviceName,
       icon: pendingBookWorker.icon,
       color: pendingBookWorker.color,
       date: 'Just now',
@@ -484,18 +586,14 @@
   });
   document.getElementById('bookDoneBtn').addEventListener('click', () => bookModal.classList.remove('open'));
 
-  // ---------- Personalize greeting from signup/login (demo only — no real session) ----------
-  const urlParams = new URLSearchParams(window.location.search);
-  const paramName = urlParams.get('name');
-  if(paramName){
-    document.getElementById('greetingName').textContent = 'Namaste, ' + paramName + ' 👋';
-    document.querySelector('.avatar').textContent = paramName.charAt(0).toUpperCase();
-  }
-
   // ---------- Init ----------
-  renderWorkerGrid();
-  renderFavorites();
-  renderBookings();
+  (async function init(){
+    document.getElementById('workerGrid').innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><div class="e-icon">⏳</div><p>Loading workers…</p></div>';
+    await Promise.all([loadWorkers(), loadBookings(), loadFavorites()]);
+    renderWorkerGrid();
+    renderFavorites();
+    renderBookings();
+  })();
 })();
 </script>
 </body>
