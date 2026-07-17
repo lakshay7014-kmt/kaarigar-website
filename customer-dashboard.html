@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kaarigar — Your Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --wall:#EDE7D9; --wall-2:#E3D9C4; --paper:#FAF6EC; --ink:#211D18; --ink-soft:#5B5348;
+    --mustard:#E8A63B; --signal:#BF3B2C; --teal:#1B6B68; --leaf:#5C7A4E; --rose:#C4577A; --navy:#223A5E;
+    --line: rgba(33,29,24,0.14); --radius: 10px; --sidebar-w: 240px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--wall);color:var(--ink);font-family:'Inter',sans-serif;line-height:1.5;}
+  h1,h2,h3{font-family:'Baloo 2',sans-serif;font-weight:700;margin:0;}
+  .mono{font-family:'IBM Plex Mono',monospace;letter-spacing:0.04em;text-transform:uppercase;font-size:0.7rem;font-weight:600;}
+  button,input{font-family:inherit;}
+  :focus-visible{outline:3px solid var(--signal);outline-offset:2px;}
+
+  .demo-bar{
+    background:var(--ink);color:var(--paper);text-align:center;font-size:0.82rem;
+    padding:8px 16px;
+  }
+  .demo-bar a{color:var(--mustard);font-weight:600;text-decoration:underline;}
+
+  .app{display:flex;min-height:calc(100vh - 36px);}
+
+  /* SIDEBAR */
+  .sidebar{
+    width:var(--sidebar-w);flex-shrink:0;background:var(--paper);
+    border-right:1px solid var(--line);padding:22px 16px;display:flex;flex-direction:column;
+  }
+  .logo{display:flex;align-items:center;gap:10px;margin-bottom:30px;padding:0 8px;}
+  .logo-mark{width:34px;height:34px;background:var(--signal);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--paper);font-family:'Baloo 2';font-weight:800;transform:rotate(-4deg);}
+  .logo-word{font-family:'Baloo 2';font-weight:700;font-size:1.1rem;}
+  .nav-item{
+    display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:8px;
+    color:var(--ink-soft);text-decoration:none;font-weight:600;font-size:0.92rem;
+    cursor:pointer;border:none;background:none;width:100%;text-align:left;margin-bottom:2px;
+  }
+  .nav-item:hover{background:var(--wall);color:var(--ink);}
+  .nav-item.active{background:var(--ink);color:var(--paper);}
+  .nav-item .icon{font-size:1.05rem;width:20px;text-align:center;}
+  .nav-sep{height:1px;background:var(--line);margin:14px 8px;}
+  .sidebar-bottom{margin-top:auto;}
+  .switch-role{
+    display:block;text-align:center;font-size:0.82rem;color:var(--ink-soft);
+    padding:10px;border:1px dashed var(--line);border-radius:8px;text-decoration:none;margin-top:10px;
+  }
+
+  /* TOPBAR */
+  .main{flex:1;min-width:0;}
+  .topbar{
+    display:flex;align-items:center;gap:16px;padding:18px 28px;
+    background:var(--paper);border-bottom:1px solid var(--line);position:sticky;top:36px;z-index:10;
+  }
+  .search-box{
+    flex:1;display:flex;align-items:center;gap:10px;background:var(--wall);
+    border:2px solid transparent;border-radius:10px;padding:11px 16px;max-width:520px;
+  }
+  .search-box:focus-within{border-color:var(--signal);background:var(--paper);}
+  .search-box input{border:none;background:none;outline:none;font-size:0.95rem;width:100%;color:var(--ink);}
+  .topbar-right{display:flex;align-items:center;gap:16px;margin-left:auto;}
+  .icon-btn{background:none;border:none;font-size:1.15rem;cursor:pointer;position:relative;}
+  .badge-dot{position:absolute;top:-2px;right:-4px;width:8px;height:8px;background:var(--signal);border-radius:50%;}
+  .avatar{
+    width:38px;height:38px;border-radius:50%;background:var(--rose);color:var(--paper);
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-family:'Baloo 2';
+  }
+
+  .content{padding:28px;max-width:1080px;}
+  .view{display:none;}
+  .view.active{display:block;}
+
+  .greeting{margin-bottom:22px;}
+  .greeting p{color:var(--ink-soft);margin-top:4px;}
+
+  /* Category chips */
+  .chips{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:26px;}
+  .chip{
+    padding:9px 16px;border-radius:999px;border:2px solid var(--line);background:var(--paper);
+    font-size:0.86rem;font-weight:600;cursor:pointer;color:var(--ink-soft);display:flex;align-items:center;gap:6px;
+  }
+  .chip.active{background:var(--ink);border-color:var(--ink);color:var(--paper);}
+  .chip:hover:not(.active){border-color:var(--signal);color:var(--ink);}
+
+  /* Worker cards */
+  .worker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;}
+  .worker-card{
+    background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px;position:relative;
+  }
+  .fav-btn{
+    position:absolute;top:14px;right:14px;background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--ink-soft);
+  }
+  .fav-btn.active{color:var(--signal);}
+  .worker-top{display:flex;gap:12px;align-items:center;margin-bottom:12px;}
+  .worker-avatar{
+    width:48px;height:48px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+    font-size:1.4rem;flex-shrink:0;
+  }
+  .worker-name{font-family:'Baloo 2';font-weight:700;font-size:1.02rem;}
+  .worker-skill{color:var(--ink-soft);font-size:0.85rem;}
+  .worker-meta{display:flex;gap:14px;font-size:0.82rem;color:var(--ink-soft);margin-bottom:14px;}
+  .worker-meta span{display:flex;align-items:center;gap:4px;}
+  .worker-footer{display:flex;justify-content:space-between;align-items:center;}
+  .worker-price{font-family:'IBM Plex Mono';font-weight:600;font-size:0.92rem;}
+  .book-btn{
+    background:var(--signal);color:var(--paper);border:none;padding:9px 16px;
+    border-radius:7px;font-weight:600;font-size:0.85rem;cursor:pointer;
+  }
+  .book-btn:hover{background:var(--ink);}
+
+  /* Bookings */
+  .tabs{display:inline-flex;background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:4px;margin-bottom:22px;}
+  .tab-btn{font-weight:600;font-size:0.86rem;padding:9px 18px;border-radius:999px;border:none;background:transparent;color:var(--ink-soft);cursor:pointer;}
+  .tab-btn[aria-selected="true"]{background:var(--ink);color:var(--paper);}
+  .booking-card{
+    background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px 20px;display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap;
+  }
+  .booking-avatar{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;}
+  .booking-info{flex:1;min-width:180px;}
+  .booking-info strong{font-family:'Baloo 2';display:block;}
+  .booking-info span{color:var(--ink-soft);font-size:0.85rem;}
+  .status-badge{
+    padding:5px 12px;border-radius:999px;font-size:0.76rem;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;
+  }
+  .status-pending{background:rgba(232,166,59,0.2);color:#8A5D14;}
+  .status-accepted{background:rgba(27,107,104,0.18);color:var(--teal);}
+  .status-completed{background:rgba(92,122,78,0.18);color:var(--leaf);}
+  .status-cancelled{background:rgba(191,59,44,0.14);color:var(--signal);}
+  .booking-actions{display:flex;gap:8px;}
+  .ghost-btn{background:none;border:1px solid var(--line);padding:8px 14px;border-radius:7px;font-size:0.82rem;font-weight:600;cursor:pointer;color:var(--ink);}
+  .ghost-btn:hover{border-color:var(--ink);}
+
+  .empty-state{text-align:center;padding:50px 20px;color:var(--ink-soft);}
+  .empty-state .e-icon{font-size:2.2rem;margin-bottom:10px;}
+
+  /* Booking modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(33,29,24,0.55);display:none;align-items:center;justify-content:center;z-index:100;padding:20px;}
+  .modal-overlay.open{display:flex;}
+  .modal-box{background:var(--paper);border-radius:14px;max-width:420px;width:100%;padding:30px;position:relative;max-height:90vh;overflow-y:auto;}
+  .modal-close{position:absolute;top:14px;right:14px;background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--ink-soft);}
+  .modal-box h3{font-size:1.25rem;margin-bottom:4px;}
+  .modal-box .sub{color:var(--ink-soft);font-size:0.9rem;margin-bottom:20px;}
+  .form-field{margin-bottom:16px;text-align:left;}
+  .form-field label{display:block;font-weight:600;font-size:0.85rem;margin-bottom:6px;}
+  .form-field input,.form-field textarea{
+    width:100%;padding:11px 13px;border-radius:8px;border:2px solid var(--line);
+    font-size:0.95rem;background:var(--wall);
+  }
+  .form-field input:focus,.form-field textarea:focus{border-color:var(--signal);background:var(--paper);}
+  .modal-submit{width:100%;padding:13px;border-radius:8px;border:none;background:var(--signal);color:var(--paper);font-weight:600;font-size:0.98rem;cursor:pointer;margin-top:4px;}
+  .modal-submit:hover{background:var(--ink);}
+  .modal-step{display:none;}
+  .modal-step.active{display:block;}
+  .modal-step-success{text-align:center;}
+  .success-icon{width:52px;height:52px;border-radius:50%;background:var(--leaf);color:var(--paper);display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin:0 auto 16px;}
+
+  @media(max-width:820px){
+    .sidebar{position:fixed;left:-260px;top:0;bottom:0;z-index:60;transition:left 0.2s ease;box-shadow:4px 0 20px rgba(0,0,0,0.15);}
+    .sidebar.open{left:0;}
+    .menu-toggle{display:inline-flex !important;}
+  }
+  .menu-toggle{display:none;background:none;border:none;font-size:1.3rem;cursor:pointer;}
+</style>
+</head>
+<body>
+
+<div class="demo-bar">Prototype preview — showing mock data, not connected to a live backend yet. <a href="index.html">← Back to landing page</a></div>
+
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="logo"><span class="logo-mark">क</span><span class="logo-word">Kaarigar</span></div>
+    <button class="nav-item active" data-view="home"><span class="icon">🔍</span> Search</button>
+    <button class="nav-item" data-view="bookings"><span class="icon">📋</span> My Bookings</button>
+    <button class="nav-item" data-view="favorites"><span class="icon">❤️</span> Favorites</button>
+    <button class="nav-item" data-view="chat"><span class="icon">💬</span> Messages</button>
+    <div class="nav-sep"></div>
+    <button class="nav-item" data-view="settings"><span class="icon">⚙️</span> Settings</button>
+    <div class="sidebar-bottom">
+      <a class="switch-role" href="worker-dashboard.html">Switch to worker view →</a>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <button class="menu-toggle" id="menuToggle">☰</button>
+      <div class="search-box">
+        <span>🔎</span>
+        <input type="text" id="searchInput" placeholder="Search — e.g. AC repair, tailor, tutor near me">
+      </div>
+      <div class="topbar-right">
+        <button class="icon-btn">🔔<span class="badge-dot"></span></button>
+        <div class="avatar">P</div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- HOME / SEARCH -->
+      <div class="view active" id="view-home">
+        <div class="greeting">
+          <h2 id="greetingName">Namaste, Priya 👋</h2>
+          <p>What do you need help with today?</p>
+        </div>
+        <div class="chips" id="categoryChips">
+          <button class="chip active" data-cat="all">All</button>
+          <button class="chip" data-cat="Tailoring">✂️ Tailoring</button>
+          <button class="chip" data-cat="Electrician">⚡ Electrician</button>
+          <button class="chip" data-cat="Plumbing">🔧 Plumbing</button>
+          <button class="chip" data-cat="Tutoring">📘 Tutoring</button>
+          <button class="chip" data-cat="Cooking">🍲 Home Cooking</button>
+          <button class="chip" data-cat="Beautician">💇 Beautician</button>
+          <button class="chip" data-cat="AC Repair">❄️ AC Repair</button>
+        </div>
+        <div class="worker-grid" id="workerGrid"></div>
+      </div>
+
+      <!-- BOOKINGS -->
+      <div class="view" id="view-bookings">
+        <div class="greeting"><h2>My Bookings</h2></div>
+        <div class="tabs" role="tablist">
+          <button class="tab-btn" role="tab" aria-selected="true" data-btab="upcoming">Upcoming</button>
+          <button class="tab-btn" role="tab" aria-selected="false" data-btab="completed">Completed</button>
+          <button class="tab-btn" role="tab" aria-selected="false" data-btab="cancelled">Cancelled</button>
+        </div>
+        <div id="bookingsList"></div>
+      </div>
+
+      <!-- FAVORITES -->
+      <div class="view" id="view-favorites">
+        <div class="greeting"><h2>Favorites</h2></div>
+        <div class="worker-grid" id="favoritesGrid"></div>
+      </div>
+
+      <!-- CHAT (placeholder) -->
+      <div class="view" id="view-chat">
+        <div class="greeting"><h2>Messages</h2></div>
+        <div class="empty-state">
+          <div class="e-icon">💬</div>
+          <p>Chat opens once you have an active booking with a worker.</p>
+        </div>
+      </div>
+
+      <!-- SETTINGS (placeholder) -->
+      <div class="view" id="view-settings">
+        <div class="greeting"><h2>Settings</h2></div>
+        <div class="empty-state">
+          <div class="e-icon">⚙️</div>
+          <p>Account, notification and privacy settings will live here.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- BOOKING MODAL -->
+<div class="modal-overlay" id="bookModal" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <button class="modal-close" id="bookModalClose">&times;</button>
+    <div class="modal-step active" data-mstep="form">
+      <h3 id="bookWorkerName">Book worker</h3>
+      <p class="sub" id="bookWorkerSkill"></p>
+      <div class="form-field">
+        <label for="bookDate">Preferred date</label>
+        <input type="date" id="bookDate">
+      </div>
+      <div class="form-field">
+        <label for="bookTime">Preferred time</label>
+        <input type="time" id="bookTime">
+      </div>
+      <div class="form-field">
+        <label for="bookNote">What do you need? (optional)</label>
+        <textarea id="bookNote" rows="3" placeholder="e.g. Blouse stitching, need it altered slightly at the waist"></textarea>
+      </div>
+      <button class="modal-submit" id="confirmBookBtn">Confirm & pay ₹<span id="bookPrice">0</span></button>
+    </div>
+    <div class="modal-step modal-step-success" data-mstep="success">
+      <div class="success-icon">✓</div>
+      <h3>Booking sent!</h3>
+      <p class="sub">The worker has been notified. You'll get an update once they accept.</p>
+      <button class="modal-submit" id="bookDoneBtn">Done</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ---------- Mock data (in-memory only, no backend / no localStorage) ----------
+  const workers = [
+    {id:1, name:'Ramesh Kumar', skill:'AC Repair', cat:'AC Repair', icon:'❄️', color:'var(--teal)', rating:4.9, distance:'0.8 km', price:499, jobs:212},
+    {id:2, name:'Sunita Devi', skill:'Tailoring — Blouse & Alterations', cat:'Tailoring', icon:'✂️', color:'var(--mustard)', rating:4.8, distance:'1.1 km', price:250, jobs:340},
+    {id:3, name:'Vikram Singh', skill:'Electrician', cat:'Electrician', icon:'⚡', color:'var(--signal)', rating:4.7, distance:'1.4 km', price:350, jobs:190},
+    {id:4, name:'Anita Sharma', skill:'Maths & Science Tutor', cat:'Tutoring', icon:'📘', color:'var(--leaf)', rating:5.0, distance:'0.6 km', price:400, jobs:88},
+    {id:5, name:'Meena Kaushik', skill:'Home Cook — North Indian Tiffin', cat:'Cooking', icon:'🍲', color:'var(--rose)', rating:4.6, distance:'2.0 km', price:150, jobs:410},
+    {id:6, name:'Pooja Beauty Studio', skill:'Beautician — Home Service', cat:'Beautician', icon:'💇', color:'var(--navy)', rating:4.8, distance:'1.7 km', price:600, jobs:265},
+    {id:7, name:'Amit Plumbing Works', skill:'Plumbing', cat:'Plumbing', icon:'🔧', color:'var(--teal)', rating:4.5, distance:'2.3 km', price:300, jobs:150},
+    {id:8, name:'Rekha Tailors', skill:'Tailoring — Custom Stitching', cat:'Tailoring', icon:'✂️', color:'var(--mustard)', rating:4.9, distance:'1.9 km', price:280, jobs:520},
+  ];
+
+  let bookings = [
+    {id:101, workerName:'Ramesh Kumar', skill:'AC Repair', icon:'❄️', color:'var(--teal)', date:'20 Jul, 4:00 PM', status:'accepted', price:499},
+    {id:102, workerName:'Anita Sharma', skill:'Maths Tutoring', icon:'📘', color:'var(--leaf)', date:'15 Jul, 6:00 PM', status:'completed', price:400},
+    {id:103, workerName:'Vikram Singh', skill:'Electrician', icon:'⚡', color:'var(--signal)', date:'12 Jul, 11:00 AM', status:'cancelled', price:350},
+  ];
+
+  let favorites = new Set([2, 4]);
+  let activeCategory = 'all';
+  let searchQuery = '';
+  let pendingBookWorker = null;
+
+  // ---------- Rendering ----------
+  function workerCard(w){
+    const isFav = favorites.has(w.id);
+    return `
+      <div class="worker-card">
+        <button class="fav-btn ${isFav?'active':''}" data-fav="${w.id}">${isFav ? '♥' : '♡'}</button>
+        <div class="worker-top">
+          <div class="worker-avatar" style="background:${w.color};">${w.icon}</div>
+          <div>
+            <div class="worker-name">${w.name}</div>
+            <div class="worker-skill">${w.skill}</div>
+          </div>
+        </div>
+        <div class="worker-meta">
+          <span>⭐ ${w.rating}</span>
+          <span>📍 ${w.distance}</span>
+          <span>✅ ${w.jobs} jobs</span>
+        </div>
+        <div class="worker-footer">
+          <div class="worker-price">₹${w.price}<span style="color:var(--ink-soft);font-weight:400;">/visit</span></div>
+          <button class="book-btn" data-book="${w.id}">Book Now</button>
+        </div>
+      </div>`;
+  }
+
+  function renderWorkerGrid(){
+    const grid = document.getElementById('workerGrid');
+    let filtered = workers.filter(w =>
+      (activeCategory === 'all' || w.cat === activeCategory) &&
+      (searchQuery === '' || (w.name + w.skill + w.cat).toLowerCase().includes(searchQuery))
+    );
+    grid.innerHTML = filtered.length
+      ? filtered.map(workerCard).join('')
+      : '<div class="empty-state" style="grid-column:1/-1;"><div class="e-icon">🔍</div><p>No workers match that search yet.</p></div>';
+    attachCardHandlers(grid);
+  }
+
+  function renderFavorites(){
+    const grid = document.getElementById('favoritesGrid');
+    const favWorkers = workers.filter(w => favorites.has(w.id));
+    grid.innerHTML = favWorkers.length
+      ? favWorkers.map(workerCard).join('')
+      : '<div class="empty-state" style="grid-column:1/-1;"><div class="e-icon">❤️</div><p>Workers you save will show up here.</p></div>';
+    attachCardHandlers(grid);
+  }
+
+  function attachCardHandlers(scope){
+    scope.querySelectorAll('[data-fav]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = Number(btn.dataset.fav);
+        favorites.has(id) ? favorites.delete(id) : favorites.add(id);
+        renderWorkerGrid();
+        renderFavorites();
+      });
+    });
+    scope.querySelectorAll('[data-book]').forEach(btn => {
+      btn.addEventListener('click', () => openBookModal(Number(btn.dataset.book)));
+    });
+  }
+
+  const statusLabel = {pending:'Pending', accepted:'Accepted', completed:'Completed', cancelled:'Cancelled'};
+
+  function bookingCard(b){
+    const canCancel = b.status === 'pending' || b.status === 'accepted';
+    return `
+      <div class="booking-card">
+        <div class="booking-avatar" style="background:${b.color};">${b.icon}</div>
+        <div class="booking-info">
+          <strong>${b.workerName}</strong>
+          <span>${b.skill} · ${b.date} · ₹${b.price}</span>
+        </div>
+        <span class="status-badge status-${b.status}">${statusLabel[b.status]}</span>
+        <div class="booking-actions">
+          ${b.status === 'completed' ? '<button class="ghost-btn">Rate</button>' : ''}
+          ${canCancel ? `<button class="ghost-btn" data-cancel="${b.id}">Cancel</button>` : ''}
+          <button class="ghost-btn">Chat</button>
+        </div>
+      </div>`;
+  }
+
+  let activeBookingTab = 'upcoming';
+  function renderBookings(){
+    const list = document.getElementById('bookingsList');
+    let filtered;
+    if(activeBookingTab === 'upcoming') filtered = bookings.filter(b => b.status === 'pending' || b.status === 'accepted');
+    else if(activeBookingTab === 'completed') filtered = bookings.filter(b => b.status === 'completed');
+    else filtered = bookings.filter(b => b.status === 'cancelled');
+
+    list.innerHTML = filtered.length
+      ? filtered.map(bookingCard).join('')
+      : `<div class="empty-state"><div class="e-icon">📋</div><p>No ${activeBookingTab} bookings yet.</p></div>`;
+
+    list.querySelectorAll('[data-cancel]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const b = bookings.find(x => x.id === Number(btn.dataset.cancel));
+        if(b){ b.status = 'cancelled'; renderBookings(); }
+      });
+    });
+  }
+
+  // ---------- Sidebar navigation ----------
+  document.querySelectorAll('.nav-item[data-view]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.nav-item[data-view]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.getElementById('view-' + btn.dataset.view).classList.add('active');
+      document.getElementById('sidebar').classList.remove('open');
+    });
+  });
+  document.getElementById('menuToggle').addEventListener('click', () => {
+    document.getElementById('sidebar').classList.toggle('open');
+  });
+
+  // ---------- Category chips + search ----------
+  document.getElementById('categoryChips').addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip');
+    if(!chip) return;
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    activeCategory = chip.dataset.cat;
+    renderWorkerGrid();
+  });
+  document.getElementById('searchInput').addEventListener('input', (e) => {
+    searchQuery = e.target.value.toLowerCase();
+    renderWorkerGrid();
+  });
+
+  // ---------- Booking tabs ----------
+  document.querySelectorAll('[data-btab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-btab]').forEach(b => b.setAttribute('aria-selected','false'));
+      btn.setAttribute('aria-selected','true');
+      activeBookingTab = btn.dataset.btab;
+      renderBookings();
+    });
+  });
+
+  // ---------- Booking modal ----------
+  const bookModal = document.getElementById('bookModal');
+  function openBookModal(workerId){
+    pendingBookWorker = workers.find(w => w.id === workerId);
+    document.getElementById('bookWorkerName').textContent = 'Book ' + pendingBookWorker.name;
+    document.getElementById('bookWorkerSkill').textContent = pendingBookWorker.skill;
+    document.getElementById('bookPrice').textContent = pendingBookWorker.price;
+    document.querySelectorAll('.modal-step').forEach(s => s.classList.remove('active'));
+    document.querySelector('[data-mstep="form"]').classList.add('active');
+    bookModal.classList.add('open');
+  }
+  document.getElementById('bookModalClose').addEventListener('click', () => bookModal.classList.remove('open'));
+  bookModal.addEventListener('click', (e) => { if(e.target === bookModal) bookModal.classList.remove('open'); });
+
+  document.getElementById('confirmBookBtn').addEventListener('click', () => {
+    // In production: create booking via API, then initiate Razorpay escrow payment.
+    bookings.unshift({
+      id: Date.now(),
+      workerName: pendingBookWorker.name,
+      skill: pendingBookWorker.skill,
+      icon: pendingBookWorker.icon,
+      color: pendingBookWorker.color,
+      date: 'Just now',
+      status: 'pending',
+      price: pendingBookWorker.price
+    });
+    document.querySelectorAll('.modal-step').forEach(s => s.classList.remove('active'));
+    document.querySelector('[data-mstep="success"]').classList.add('active');
+    renderBookings();
+  });
+  document.getElementById('bookDoneBtn').addEventListener('click', () => bookModal.classList.remove('open'));
+
+  // ---------- Personalize greeting from signup/login (demo only — no real session) ----------
+  const urlParams = new URLSearchParams(window.location.search);
+  const paramName = urlParams.get('name');
+  if(paramName){
+    document.getElementById('greetingName').textContent = 'Namaste, ' + paramName + ' 👋';
+    document.querySelector('.avatar').textContent = paramName.charAt(0).toUpperCase();
+  }
+
+  // ---------- Init ----------
+  renderWorkerGrid();
+  renderFavorites();
+  renderBookings();
+})();
+</script>
+</body>
+</html>
