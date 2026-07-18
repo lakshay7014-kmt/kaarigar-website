@@ -313,27 +313,8 @@
   };
   function styleFor(cat){ return CATEGORY_STYLE[cat] || {icon:'🧰', color:'var(--ink-soft)'}; }
 
-  // ---------- Auth gate: this page needs a real logged-in customer ----------
-  const urlParams = new URLSearchParams(window.location.search);
-  const uid = urlParams.get('uid');
-  const paramName = urlParams.get('name');
-
-  if(!BACKEND_READY){
-    document.querySelector('.content').innerHTML =
-      '<div class="empty-state"><div class="e-icon">⚠️</div><p>Backend not connected yet — add your Supabase URL & key at the top of customer-dashboard.html.</p></div>';
-    return;
-  }
-  if(!uid){
-    document.querySelector('.content').innerHTML =
-      '<div class="empty-state"><div class="e-icon">🔒</div><p>You need to log in to see your dashboard.</p><br><a href="index.html" class="ghost-btn" style="text-decoration:none;">Go to login</a></div>';
-    return;
-  }
-  if(paramName){
-    document.getElementById('greetingName').textContent = 'Namaste, ' + paramName + ' 👋';
-    document.querySelector('.avatar').textContent = paramName.charAt(0).toUpperCase();
-  }
-
   // ---------- State ----------
+  let uid = null;         // real profile id, set after checking the session
   let workers = [];       // real rows from Supabase, joined with profile + services
   let bookings = [];
   let favoriteIds = new Set();
@@ -365,7 +346,7 @@
   async function loadBookings(){
     // Goes through a controlled RPC — the bookings table itself has no
     // public read access (see security-migration.sql).
-    const { data, error } = await supabaseClient.rpc('get_my_bookings', { p_customer_id: uid });
+    const { data, error } = await supabaseClient.rpc('get_my_bookings');
     if(error){ console.error(error); return; }
     bookings = (data || []).map(b => ({
       id: b.id,
@@ -379,7 +360,7 @@
   }
 
   async function loadFavorites(){
-    const { data, error } = await supabaseClient.rpc('get_my_favorites', { p_customer_id: uid });
+    const { data, error } = await supabaseClient.rpc('get_my_favorites');
     if(error){ console.error(error); return; }
     favoriteIds = new Set((data || []).map(f => f.worker_id));
   }
@@ -436,7 +417,7 @@
         const id = btn.dataset.fav;
         const wasFav = favoriteIds.has(id);
         const { error } = await supabaseClient.rpc('toggle_favorite', {
-          p_customer_id: uid, p_worker_id: id, p_add: !wasFav
+          p_worker_id: id, p_add: !wasFav
         });
         if(error){ console.error(error); return; }
         wasFav ? favoriteIds.delete(id) : favoriteIds.add(id);
@@ -484,7 +465,7 @@
     list.querySelectorAll('[data-cancel]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const { error } = await supabaseClient.rpc('update_booking_status', {
-          p_booking_id: btn.dataset.cancel, p_actor_profile_id: uid, p_new_status: 'cancelled'
+          p_booking_id: btn.dataset.cancel, p_new_status: 'cancelled'
         });
         if(!error){
           const b = bookings.find(x => x.id === btn.dataset.cancel);
@@ -582,8 +563,48 @@
   });
   document.getElementById('bookDoneBtn').addEventListener('click', () => bookModal.classList.remove('open'));
 
+  // ---------- Auth gate: this page needs a real logged-in customer ----------
+  async function checkAuth(){
+    if(!BACKEND_READY){
+      document.querySelector('.content').innerHTML =
+        '<div class="empty-state"><div class="e-icon">⚠️</div><p>Backend not connected yet — add your Supabase URL & key at the top of customer-dashboard.html.</p></div>';
+      return false;
+    }
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if(!session){
+      document.querySelector('.content').innerHTML =
+        '<div class="empty-state"><div class="e-icon">🔒</div><p>You need to log in to see your dashboard.</p><br><a href="index.html" class="ghost-btn" style="text-decoration:none;">Go to login</a></div>';
+      return false;
+    }
+
+    const { data: profile, error } = await supabaseClient
+      .from('profiles')
+      .select('id, name, role')
+      .eq('user_id', session.user.id)
+      .maybeSingle();
+
+    if(error || !profile){
+      document.querySelector('.content').innerHTML =
+        '<div class="empty-state"><div class="e-icon">⚠️</div><p>Could not find your profile.</p><br><a href="index.html" class="ghost-btn" style="text-decoration:none;">Go to login</a></div>';
+      return false;
+    }
+
+    if(profile.role !== 'customer'){
+      window.location.href = 'worker-dashboard.html';
+      return false;
+    }
+
+    uid = profile.id;
+    document.getElementById('greetingName').textContent = 'Namaste, ' + profile.name + ' 👋';
+    document.querySelector('.avatar').textContent = (profile.name || 'C').charAt(0).toUpperCase();
+    return true;
+  }
+
   // ---------- Init ----------
   (async function init(){
+    const ok = await checkAuth();
+    if(!ok) return;
     document.getElementById('workerGrid').innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><div class="e-icon">⏳</div><p>Loading workers…</p></div>';
     await Promise.all([loadWorkers(), loadBookings(), loadFavorites()]);
     renderWorkerGrid();

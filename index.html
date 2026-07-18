@@ -330,14 +330,24 @@
     background:var(--wall);cursor:pointer;width:100%;
   }
   .role-card:hover{border-color:var(--signal);background:var(--paper);}
+  .role-card.selected{border-color:var(--signal);background:var(--paper);box-shadow:0 0 0 1px var(--signal);}
   .role-card .role-icon{
     width:44px;height:44px;border-radius:8px;display:flex;align-items:center;justify-content:center;
     font-size:1.4rem;flex-shrink:0;
   }
-  .role-card[data-role="customer"] .role-icon{background:var(--mustard);}
-  .role-card[data-role="worker"] .role-icon{background:var(--teal);color:var(--paper);}
+  .role-card[data-select-role="customer"] .role-icon{background:var(--mustard);}
+  .role-card[data-select-role="worker"] .role-icon{background:var(--teal);color:var(--paper);}
   .role-card strong{display:block;font-size:1rem;font-family:'Baloo 2',sans-serif;}
   .role-card span{display:block;color:var(--ink-soft);font-size:0.86rem;margin-top:2px;}
+
+  .google-btn{
+    display:flex;align-items:center;justify-content:center;gap:10px;
+    width:100%;padding:14px;border-radius:8px;border:2px solid var(--line);
+    background:var(--paper);font-weight:600;font-size:1rem;cursor:pointer;
+    font-family:'Inter',sans-serif;color:var(--ink);
+  }
+  .google-btn:hover{border-color:var(--ink);background:var(--wall);}
+  .google-btn:disabled{opacity:0.6;cursor:not-allowed;}
 
   .form-field{margin-bottom:18px;text-align:left;}
   .form-field label{display:block;font-weight:600;font-size:0.88rem;margin-bottom:6px;}
@@ -552,81 +562,53 @@
   <div class="modal-box">
     <button class="modal-close" id="modalClose" aria-label="Close">&times;</button>
 
-    <!-- STEP: choose role (both signup and login) -->
-    <div class="modal-step" data-step="role">
-      <span class="mono modal-eyebrow" id="roleEyebrow" style="color:var(--ink-soft);">GET STARTED</span>
-      <h3 id="modalTitle">Which one are you?</h3>
-      <p class="modal-sub" id="roleSub">We'll set your account up differently depending on this — you can always add the other role later.</p>
-      <div class="role-cards">
+    <!-- STEP: Google sign-in entry -->
+    <div class="modal-step active" data-step="google">
+      <span class="mono modal-eyebrow" style="color:var(--ink-soft);">GET STARTED</span>
+      <h3 id="modalTitle">Sign in to Kaarigar</h3>
+      <p class="modal-sub">One tap with your Google account — no password, no waiting for a code.</p>
+      <button class="google-btn" id="googleSignInBtn">
+        <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
+          <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/>
+          <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
+          <path fill="#4CAF50" d="M24 44c5.5 0 10.4-1.9 14.2-5.1l-6.6-5.4c-2 1.4-4.6 2.3-7.6 2.3-5.2 0-9.6-3.3-11.2-7.9l-6.6 5.1C9.6 39.6 16.2 44 24 44z"/>
+          <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.2-4.1 5.6l6.6 5.4C41.9 35.9 44 30.4 44 24c0-1.3-.1-2.7-.4-3.5z"/>
+        </svg>
+        <span>Continue with Google</span>
+      </button>
+      <div class="modal-error" id="googleError"></div>
+    </div>
+
+    <!-- STEP: complete profile (first-time Google users only) -->
+    <div class="modal-step" data-step="complete-profile">
+      <span class="mono modal-eyebrow" style="color:var(--ink-soft);">ONE LAST THING</span>
+      <h3>Complete your profile</h3>
+      <p class="modal-sub" id="googleGreeting">Welcome!</p>
+
+      <div class="role-cards" style="margin-bottom:18px;">
         <button class="role-card" data-select-role="customer">
           <span class="role-icon">🏠</span>
-          <span><strong id="roleCardCustomerLabel">I need work done</strong><span>Find and book skilled workers nearby</span></span>
+          <span><strong>I need work done</strong><span>Find and book skilled workers nearby</span></span>
         </button>
         <button class="role-card" data-select-role="worker">
           <span class="role-icon">🛠️</span>
-          <span><strong id="roleCardWorkerLabel">I offer a skill</strong><span>Get found by customers near you</span></span>
+          <span><strong>I offer a skill</strong><span>Get found by customers near you</span></span>
         </button>
-      </div>
-    </div>
-
-    <!-- STEP: details + phone number -->
-    <div class="modal-step" data-step="phone">
-      <button class="modal-back" data-back-to="role">← Back</button>
-      <span class="mono modal-eyebrow" id="phoneRoleTag" style="color:var(--ink-soft);">SIGNING UP AS CUSTOMER</span>
-      <h3 id="phoneTitle">Tell us about yourself</h3>
-      <p class="modal-sub" id="phoneSub">We'll send a 4-digit code to verify it's you.</p>
-
-      <div id="nameAgeFields">
-        <div class="form-field">
-          <label for="nameInput">Full name</label>
-          <input type="text" id="nameInput" placeholder="e.g. Ramesh Kumar">
-        </div>
-        <div class="form-field">
-          <label for="ageInput">Age</label>
-          <input type="number" id="ageInput" inputmode="numeric" min="16" max="100" placeholder="e.g. 28">
-        </div>
       </div>
 
       <div class="form-field">
-        <label for="phoneInput">Phone number</label>
-        <div class="phone-row">
-          <div class="cc">+91</div>
-          <input type="tel" id="phoneInput" inputmode="numeric" maxlength="10" placeholder="98765 43210">
-        </div>
+        <label for="ageInput">Age</label>
+        <input type="number" id="ageInput" inputmode="numeric" min="16" max="100" placeholder="e.g. 28">
       </div>
-      <div class="modal-error" id="phoneError">Please fill in all fields correctly (name, age 16+, 10-digit phone).</div>
-      <button class="modal-submit" id="sendOtpBtn">Send OTP</button>
-    </div>
-
-    <!-- STEP: otp -->
-    <div class="modal-step" data-step="otp">
-      <button class="modal-back" data-back-to="phone">← Back</button>
-      <span class="mono modal-eyebrow" style="color:var(--ink-soft);">VERIFY</span>
-      <h3>Enter the code</h3>
-      <p class="modal-sub" id="otpSentTo">Sent to +91 XXXXXXXXXX</p>
-      <div class="modal-error show" style="background:rgba(232,166,59,0.15);color:#8A5D14;border-radius:8px;padding:10px 12px;font-size:0.85rem;margin-bottom:14px;">
-        This is a demo — no real SMS is sent yet (there's no backend connected). Use code <strong>1234</strong>, or tap "Autofill demo code" below.
-      </div>
-      <div class="otp-row">
-        <input type="text" inputmode="numeric" maxlength="1" class="otp-digit">
-        <input type="text" inputmode="numeric" maxlength="1" class="otp-digit">
-        <input type="text" inputmode="numeric" maxlength="1" class="otp-digit">
-        <input type="text" inputmode="numeric" maxlength="1" class="otp-digit">
-      </div>
-      <div class="modal-error" id="otpError">Enter all 4 digits.</div>
-      <button class="modal-submit" id="verifyOtpBtn">Verify & continue</button>
-      <p class="resend-note">
-        <button id="autofillOtp" type="button">Autofill demo code</button> ·
-        <button id="resendOtp" type="button">Resend code</button>
-      </p>
+      <div class="modal-error" id="profileError">Please select a role and enter a valid age (16+).</div>
+      <button class="modal-submit" id="completeProfileBtn">Finish setup</button>
     </div>
 
     <!-- STEP: success -->
     <div class="modal-step modal-step-success" data-step="success">
       <div class="success-icon">✓</div>
       <h3 id="successTitle">You're in!</h3>
-      <p class="modal-sub" id="successSub">Your account has been created.</p>
-      <button class="modal-submit" id="successDone">Done</button>
+      <p class="modal-sub" id="successSub">Redirecting you now…</p>
     </div>
   </div>
 </div>
@@ -697,58 +679,26 @@
       waitlistForm.reset();
     });
 
-    // ---------- Auth modal state machine ----------
+
+    // ---------- Google Auth modal ----------
     const overlay = document.getElementById('modalOverlay');
     const steps = document.querySelectorAll('.modal-step');
-    let mode = 'signup'; // 'signup' | 'login'
-    let selectedRole = null;
     let lastFocused = null;
+    let selectedRole = null;
+    let pendingSession = null;
 
     function showStep(name){
       steps.forEach(s => s.classList.toggle('active', s.dataset.step === name));
-      const firstInput = overlay.querySelector('.modal-step.active input, .modal-step.active .role-card');
+      const firstInput = overlay.querySelector('.modal-step.active input, .modal-step.active .role-card, .modal-step.active button');
       if(firstInput) setTimeout(() => firstInput.focus(), 50);
     }
 
-    function openModal(startMode, presetRole){
-      mode = startMode || 'signup';
-      selectedRole = presetRole || null;
+    function openModal(){
       lastFocused = document.activeElement;
       overlay.classList.add('open');
       document.body.classList.add('modal-open');
-
-      document.getElementById('phoneError').classList.remove('show');
-      document.getElementById('otpError').classList.remove('show');
-      document.querySelectorAll('.otp-digit').forEach(i => i.value = '');
-      document.getElementById('phoneInput').value = '';
-      document.getElementById('nameInput').value = '';
-      document.getElementById('ageInput').value = '';
-
-      document.getElementById('nameAgeFields').style.display = (mode === 'signup') ? 'block' : 'none';
-      updateRoleStepCopy();
-
-      if(selectedRole){
-        setRole(selectedRole);
-        showStep('phone');
-      } else {
-        showStep('role');
-      }
-    }
-
-    function updateRoleStepCopy(){
-      if(mode === 'login'){
-        document.getElementById('roleEyebrow').textContent = 'WELCOME BACK';
-        document.getElementById('modalTitle').textContent = 'Log in as...';
-        document.getElementById('roleSub').textContent = 'Choose the account you want to log into.';
-        document.getElementById('roleCardCustomerLabel').textContent = 'Customer';
-        document.getElementById('roleCardWorkerLabel').textContent = 'Worker';
-      } else {
-        document.getElementById('roleEyebrow').textContent = 'GET STARTED';
-        document.getElementById('modalTitle').textContent = 'Which one are you?';
-        document.getElementById('roleSub').textContent = "We'll set your account up differently depending on this — you can always add the other role later.";
-        document.getElementById('roleCardCustomerLabel').textContent = 'I need work done';
-        document.getElementById('roleCardWorkerLabel').textContent = 'I offer a skill';
-      }
+      document.getElementById('googleError').textContent = '';
+      showStep('google');
     }
 
     function closeModal(){
@@ -757,217 +707,154 @@
       if(lastFocused) lastFocused.focus();
     }
 
-    function setRole(role){
-      selectedRole = role;
-      if(mode === 'login'){
-        document.getElementById('phoneTitle').textContent = 'Enter your phone number';
-        document.getElementById('phoneSub').textContent = "We'll send a 4-digit code to verify it's you.";
-        document.getElementById('phoneRoleTag').textContent =
-          'LOGGING IN AS ' + (role === 'worker' ? 'A WORKER' : 'A CUSTOMER');
-      } else {
-        document.getElementById('phoneTitle').textContent = 'Tell us about yourself';
-        document.getElementById('phoneSub').textContent = "We'll send a 4-digit code to verify it's you.";
-        document.getElementById('phoneRoleTag').textContent =
-          'SIGNING UP AS ' + (role === 'worker' ? 'A WORKER' : 'A CUSTOMER');
-      }
-    }
-
-    // Entry points
-    document.getElementById('navSignup').addEventListener('click', () => openModal('signup', null));
-    document.getElementById('navLogin').addEventListener('click', () => openModal('login', null));
+    document.getElementById('navSignup').addEventListener('click', () => openModal());
+    document.getElementById('navLogin').addEventListener('click', () => openModal());
     document.querySelectorAll('[data-open-signup]').forEach(btn => {
-      btn.addEventListener('click', () => openModal('signup', btn.dataset.openSignup));
-    });
-
-    // Role selection
-    document.querySelectorAll('[data-select-role]').forEach(card => {
-      card.addEventListener('click', () => {
-        setRole(card.dataset.selectRole);
-        showStep('phone');
-      });
-    });
-
-    // Back buttons
-    document.querySelectorAll('[data-back-to]').forEach(btn => {
       btn.addEventListener('click', () => {
-        showStep(btn.dataset.backTo);
+        // Remember the intended role so it carries through the Google
+        // redirect round-trip (in-memory state doesn't survive a full
+        // page navigation to Google and back, a URL param does).
+        sessionRoleIntent = btn.dataset.openSignup;
+        openModal();
       });
     });
 
-    // Close handlers
     document.getElementById('modalClose').addEventListener('click', closeModal);
     overlay.addEventListener('click', (e) => { if(e.target === overlay) closeModal(); });
     document.addEventListener('keydown', (e) => {
       if(e.key === 'Escape' && overlay.classList.contains('open')) closeModal();
     });
 
-    // Send OTP
-    const phoneInput = document.getElementById('phoneInput');
-    const nameInput = document.getElementById('nameInput');
-    const ageInput = document.getElementById('ageInput');
-    let userName = '';
-    let userAge = '';
+    let sessionRoleIntent = new URLSearchParams(window.location.search).get('intent');
 
-    phoneInput.addEventListener('input', () => {
-      phoneInput.value = phoneInput.value.replace(/\D/g,'').slice(0,10);
-    });
-    document.getElementById('sendOtpBtn').addEventListener('click', () => {
-      const phoneVal = phoneInput.value.trim();
-      const nameVal = nameInput.value.trim();
-      const ageVal = ageInput.value.trim();
-      const errorEl = document.getElementById('phoneError');
-
-      const phoneOk = phoneVal.length === 10;
-      const needsDetails = mode === 'signup';
-      const nameOk = !needsDetails || nameVal.length >= 2;
-      const ageOk = !needsDetails || (Number(ageVal) >= 16 && Number(ageVal) <= 100);
-
-      if(!phoneOk || !nameOk || !ageOk){
-        errorEl.classList.add('show');
-        return;
-      }
-      errorEl.classList.remove('show');
-      userName = nameVal;
-      userAge = ageVal;
-      document.getElementById('otpSentTo').textContent = 'Sent to +91 ' + phoneVal;
-      showStep('otp');
-    });
-
-    // OTP digit auto-advance
-    const otpDigits = document.querySelectorAll('.otp-digit');
-
-    // Demo autofill — since there's no backend/SMS provider connected yet
-    document.getElementById('autofillOtp').addEventListener('click', () => {
-      const demoCode = '1234';
-      otpDigits.forEach((input, idx) => { input.value = demoCode[idx]; });
-      otpDigits[otpDigits.length - 1].focus();
-    });
-
-    otpDigits.forEach((input, idx) => {
-      input.addEventListener('input', () => {
-        input.value = input.value.replace(/\D/g,'').slice(0,1);
-        if(input.value && idx < otpDigits.length - 1){
-          otpDigits[idx+1].focus();
-        }
-      });
-      input.addEventListener('keydown', (e) => {
-        if(e.key === 'Backspace' && !input.value && idx > 0){
-          otpDigits[idx-1].focus();
-        }
-      });
-    });
-
-    document.getElementById('resendOtp').addEventListener('click', (e) => {
-      e.preventDefault();
-      otpDigits.forEach(i => i.value = '');
-      otpDigits[0].focus();
-      // In production: re-trigger OTP send API call here.
-    });
-
-    // Verify OTP — code itself is still mocked (no real SMS yet, see the
-    // yellow banner above) but once "verified", we now do a REAL signup or
-    // login against the Supabase database.
-    let currentProfile = null;
-
-    document.getElementById('verifyOtpBtn').addEventListener('click', async () => {
-      const code = Array.from(otpDigits).map(i => i.value).join('');
-      const errorEl = document.getElementById('otpError');
-      if(code.length !== 4){
-        errorEl.classList.add('show');
-        errorEl.textContent = 'Enter all 4 digits.';
-        return;
-      }
-      errorEl.classList.remove('show');
-
+    // ---------- Google sign-in ----------
+    document.getElementById('googleSignInBtn').addEventListener('click', async () => {
       if(!BACKEND_READY){
-        errorEl.textContent = 'Backend not connected yet — add your Supabase URL & key at the top of index.html.';
+        document.getElementById('googleError').textContent = 'Backend not connected yet — add your Supabase URL & key at the top of index.html.';
+        return;
+      }
+      const btn = document.getElementById('googleSignInBtn');
+      btn.disabled = true;
+
+      const redirectUrl = window.location.origin + window.location.pathname +
+        (sessionRoleIntent ? '?intent=' + sessionRoleIntent : '');
+
+      const { error } = await supabaseClient.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: redirectUrl }
+      });
+
+      if(error){
+        document.getElementById('googleError').textContent = error.message;
+        btn.disabled = false;
+      }
+      // On success, the browser navigates away to Google — nothing more to do here.
+    });
+
+    // ---------- Role selection in the "complete profile" step ----------
+    document.querySelectorAll('[data-select-role]').forEach(card => {
+      card.addEventListener('click', () => {
+        selectedRole = card.dataset.selectRole;
+        document.querySelectorAll('[data-select-role]').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+      });
+    });
+
+    // ---------- Complete profile (first-time Google sign-in) ----------
+    document.getElementById('completeProfileBtn').addEventListener('click', async () => {
+      const ageVal = document.getElementById('ageInput').value.trim();
+      const errorEl = document.getElementById('profileError');
+      const ageOk = Number(ageVal) >= 16 && Number(ageVal) <= 100;
+
+      if(!selectedRole || !ageOk){
         errorEl.classList.add('show');
         return;
       }
+      errorEl.classList.remove('show');
 
-      const verifyBtn = document.getElementById('verifyOtpBtn');
-      verifyBtn.disabled = true;
-      verifyBtn.textContent = 'Please wait…';
+      const btn = document.getElementById('completeProfileBtn');
+      btn.disabled = true;
+      btn.textContent = 'Please wait…';
 
-      const phoneVal = document.getElementById('phoneInput').value.trim();
+      const user = pendingSession.user;
+      const displayName = (user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name)) || user.email;
 
       try{
-        if(mode === 'signup'){
-          // Create the profile row via a controlled function — direct
-          // table insert isn't used, since profiles has no public
-          // SELECT policy (protects everyone's phone numbers), and
-          // "insert...return the new row" needs one without this.
-          const { data: rows, error: profileErr } = await supabaseClient
-            .rpc('signup_profile', {
-              p_name: userName, p_age: Number(userAge), p_phone: phoneVal, p_role: selectedRole
-            });
+        const { data: profile, error: profileErr } = await supabaseClient
+          .from('profiles')
+          .insert({
+            user_id: user.id,
+            name: displayName,
+            age: Number(ageVal),
+            email: user.email,
+            role: selectedRole
+          })
+          .select()
+          .single();
 
-          if(profileErr){
-            throw new Error(
-              profileErr.message && profileErr.message.includes('already registered')
-                ? 'This phone number is already registered. Try logging in instead.'
-                : profileErr.message
-            );
-          }
-          const profile = rows && rows.length ? rows[0] : null;
-          if(!profile){ throw new Error('Signup failed, please try again.'); }
+        if(profileErr) throw profileErr;
 
-          // If signing up as a worker, also create their workers row
-          // (name is duplicated here on purpose — see security-migration.sql:
-          // the public worker directory reads from `workers`, never `profiles`)
-          if(selectedRole === 'worker'){
-            const { error: workerErr } = await supabaseClient
-              .from('workers')
-              .insert({ profile_id: profile.id, category: 'General', name: userName });
-            if(workerErr) throw workerErr;
-          }
-
-          currentProfile = profile;
-          document.getElementById('successTitle').textContent = 'You\'re in, ' + (userName || 'there') + '!';
-          document.getElementById('successSub').textContent =
-            selectedRole === 'worker'
-              ? "Account created as a worker. Next, you'll set up your board — skills, prices, and photos."
-              : "Account created as a customer. You can start searching for workers nearby right away.";
-
-        } else {
-          // Login — via a controlled RPC instead of reading the profiles
-          // table directly (that table has no public read access anymore).
-          const { data: rows, error: findErr } = await supabaseClient
-            .rpc('login_lookup', { p_phone: phoneVal, p_role: selectedRole });
-
-          if(findErr) throw findErr;
-          const profile = rows && rows.length ? rows[0] : null;
-          if(!profile){
-            throw new Error('No ' + selectedRole + ' account found with that phone number. Try signing up instead.');
-          }
-
-          currentProfile = profile;
-          document.getElementById('successTitle').textContent = 'Welcome back, ' + profile.name + '!';
-          document.getElementById('successSub').textContent = "You're logged in.";
+        if(selectedRole === 'worker'){
+          const { error: workerErr } = await supabaseClient
+            .from('workers')
+            .insert({ profile_id: profile.id, category: 'General', name: displayName });
+          if(workerErr) throw workerErr;
         }
 
-        showStep('success');
+        goToDashboard(selectedRole, displayName);
       } catch(err){
         errorEl.textContent = err.message || 'Something went wrong. Please try again.';
         errorEl.classList.add('show');
-      } finally {
-        verifyBtn.disabled = false;
-        verifyBtn.textContent = 'Verify & continue';
+        btn.disabled = false;
+        btn.textContent = 'Finish setup';
       }
     });
 
-    // Redirect to the correct real dashboard, passing the real profile id
-    // so the dashboard can fetch this person's actual data from Supabase.
-    document.getElementById('successDone').addEventListener('click', () => {
-      const target = selectedRole === 'worker' ? 'worker-dashboard.html' : 'customer-dashboard.html';
-      const params = new URLSearchParams();
-      if(currentProfile){
-        params.set('uid', currentProfile.id);
-        params.set('name', currentProfile.name);
+    function goToDashboard(role, name){
+      document.getElementById('successTitle').textContent = 'You\'re in, ' + (name || 'there') + '!';
+      showStep('success');
+      const target = role === 'worker' ? 'worker-dashboard.html' : 'customer-dashboard.html';
+      setTimeout(() => { window.location.href = target; }, 900);
+    }
+
+    // ---------- Handle the return trip from Google (or an existing session) ----------
+    async function handleSession(session){
+      pendingSession = session;
+
+      const { data: profile, error } = await supabaseClient
+        .from('profiles')
+        .select('id, name, role')
+        .eq('user_id', session.user.id)
+        .maybeSingle();
+
+      if(error){ console.error(error); return; }
+
+      if(profile){
+        // Returning user — straight to their dashboard
+        openModal();
+        goToDashboard(profile.role, profile.name);
+      } else {
+        // First Google sign-in — ask role + age
+        const displayName = (session.user.user_metadata && (session.user.user_metadata.full_name || session.user.user_metadata.name)) || session.user.email;
+        document.getElementById('googleGreeting').textContent = 'Welcome, ' + displayName + '! Just need a couple more details.';
+        if(sessionRoleIntent === 'worker' || sessionRoleIntent === 'customer'){
+          selectedRole = sessionRoleIntent;
+          const card = document.querySelector('[data-select-role="' + sessionRoleIntent + '"]');
+          if(card) card.classList.add('selected');
+        }
+        openModal();
+        showStep('complete-profile');
       }
-      const qs = params.toString();
-      window.location.href = target + (qs ? '?' + qs : '');
-    });
+    }
+
+    if(BACKEND_READY){
+      supabaseClient.auth.getSession().then(({ data }) => {
+        if(data.session) handleSession(data.session);
+      });
+      supabaseClient.auth.onAuthStateChange((event, session) => {
+        if(event === 'SIGNED_IN' && session) handleSession(session);
+      });
+    }
   })();
 </script>
 
