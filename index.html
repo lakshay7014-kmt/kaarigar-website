@@ -606,7 +606,7 @@
 
     <!-- STEP: success -->
     <div class="modal-step modal-step-success" data-step="success">
-      <div class="success-icon">✓</div>
+      <div class="success-icon" id="successIcon">✓</div>
       <h3 id="successTitle">You're in!</h3>
       <p class="modal-sub" id="successSub">Redirecting you now…</p>
     </div>
@@ -823,13 +823,26 @@
 
       const { data: profile, error } = await supabaseClient
         .from('profiles')
-        .select('id, name, role')
+        .select('id, name, role, suspended_until')
         .eq('user_id', session.user.id)
         .maybeSingle();
 
       if(error){ console.error(error); return; }
 
       if(profile){
+        const isSuspended = profile.role === 'customer' && profile.suspended_until && new Date(profile.suspended_until) > new Date();
+        if(isSuspended){
+          openModal();
+          document.querySelectorAll('.modal-step').forEach(s => s.classList.remove('active'));
+          const untilStr = new Date(profile.suspended_until).toLocaleDateString('en-IN', { day:'numeric', month:'long' });
+          document.getElementById('successTitle').textContent = 'Account suspended';
+          document.getElementById('successSub').textContent =
+            'A worker reported not being paid the agreed amount for a job. Your account is suspended until ' + untilStr + '.';
+          document.getElementById('successIcon').textContent = '⚠️';
+          document.getElementById('successIcon').style.background = 'var(--signal)';
+          showStep('success');
+          return;
+        }
         // Returning user — straight to their dashboard
         openModal();
         goToDashboard(profile.role, profile.name);

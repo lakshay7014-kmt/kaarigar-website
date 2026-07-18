@@ -278,18 +278,22 @@
         <label for="bookNote">What do you need? (optional)</label>
         <textarea id="bookNote" rows="3" placeholder="e.g. Blouse stitching, need it altered slightly at the waist"></textarea>
       </div>
-      <button class="modal-submit" id="confirmBookBtn">Confirm & pay ₹<span id="bookPrice">0</span></button>
+      <div class="modal-error show" style="background:rgba(27,107,104,0.12);color:var(--teal);border-radius:8px;padding:10px 12px;font-size:0.85rem;margin-bottom:14px;">
+        You'll pay <strong>₹<span id="bookPriceNote">0</span></strong> directly to the worker, in person, after the job is done. No online payment on Kaarigar.
+      </div>
+      <button class="modal-submit" id="confirmBookBtn">Confirm booking · ₹<span id="bookPrice">0</span></button>
     </div>
     <div class="modal-step modal-step-success" data-mstep="success">
       <div class="success-icon">✓</div>
       <h3>Booking sent!</h3>
-      <p class="sub">The worker has been notified. You'll get an update once they accept.</p>
+      <p class="sub">The worker has been notified. Pay them directly, in person, once the job is done.</p>
       <button class="modal-submit" id="bookDoneBtn">Done</button>
     </div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <script>
   // ============================================================
   // BACKEND CONFIG — must match the values you put in index.html
@@ -439,7 +443,7 @@
         <div class="booking-avatar" style="background:${b.color};">${b.icon}</div>
         <div class="booking-info">
           <strong>${b.workerName}</strong>
-          <span>${b.skill} · ${b.date} · ₹${b.price}</span>
+          <span>${b.skill} · ${b.date} · Pay ₹${b.price} in person</span>
         </div>
         <span class="status-badge status-${b.status}">${statusLabel[b.status]}</span>
         <div class="booking-actions">
@@ -521,6 +525,7 @@
     document.getElementById('bookWorkerName').textContent = 'Book ' + pendingBookWorker.name;
     document.getElementById('bookWorkerSkill').textContent = pendingBookWorker.skill;
     document.getElementById('bookPrice').textContent = pendingBookWorker.price;
+    document.getElementById('bookPriceNote').textContent = pendingBookWorker.price;
     document.querySelectorAll('.modal-step').forEach(s => s.classList.remove('active'));
     document.querySelector('[data-mstep="form"]').classList.add('active');
     bookModal.classList.add('open');
@@ -529,10 +534,13 @@
   bookModal.addEventListener('click', (e) => { if(e.target === bookModal) bookModal.classList.remove('open'); });
 
   document.getElementById('confirmBookBtn').addEventListener('click', async () => {
-    // NOTE: this creates a real booking row. Payment is not wired up yet —
-    // that's Phase 3 (Razorpay), once you're ready to set up a business account.
+    const confirmBtn = document.getElementById('confirmBookBtn');
     const note = document.getElementById('bookNote').value.trim();
-    const { data, error } = await supabaseClient
+
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Please wait…';
+
+    const { data: booking, error } = await supabaseClient
       .from('bookings')
       .insert({
         customer_id: uid,
@@ -545,10 +553,16 @@
       .select()
       .single();
 
-    if(error){ alert('Could not create booking: ' + error.message); return; }
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = 'Confirm booking · ₹' + pendingBookWorker.price;
+
+    if(error){
+      alert('Could not create booking: ' + error.message);
+      return;
+    }
 
     bookings.unshift({
-      id: data.id,
+      id: booking.id,
       workerName: pendingBookWorker.name,
       skill: pendingBookWorker.serviceName,
       icon: pendingBookWorker.icon,
@@ -557,9 +571,10 @@
       status: 'pending',
       price: pendingBookWorker.price
     });
+    renderBookings();
+
     document.querySelectorAll('.modal-step').forEach(s => s.classList.remove('active'));
     document.querySelector('[data-mstep="success"]').classList.add('active');
-    renderBookings();
   });
   document.getElementById('bookDoneBtn').addEventListener('click', () => bookModal.classList.remove('open'));
 
@@ -580,7 +595,7 @@
 
     const { data: profile, error } = await supabaseClient
       .from('profiles')
-      .select('id, name, role')
+      .select('id, name, role, suspended_until')
       .eq('user_id', session.user.id)
       .maybeSingle();
 
@@ -592,6 +607,14 @@
 
     if(profile.role !== 'customer'){
       window.location.href = 'worker-dashboard.html';
+      return false;
+    }
+
+    const isSuspended = profile.suspended_until && new Date(profile.suspended_until) > new Date();
+    if(isSuspended){
+      const untilStr = new Date(profile.suspended_until).toLocaleDateString('en-IN', { day:'numeric', month:'long' });
+      document.querySelector('.content').innerHTML =
+        '<div class="empty-state"><div class="e-icon">⚠️</div><p><strong>Your account is suspended</strong><br>A worker reported not being paid the agreed amount for a job. Your account is suspended until ' + untilStr + '.</p></div>';
       return false;
     }
 

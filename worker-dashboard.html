@@ -157,7 +157,7 @@
           <div><h2 id="greetingName">Namaste, Ramesh 👋</h2><p>Here's how your board is doing.</p></div>
         </div>
         <div class="stat-grid">
-          <div class="stat-card"><div class="stat-label">This month's earnings</div><div class="stat-value">₹18,450</div><div class="stat-sub">↑ 12% vs last month</div></div>
+          <div class="stat-card"><div class="stat-label">Collected this month</div><div class="stat-value" id="overviewEarningsMonth">₹0</div><div class="stat-sub">Paid to you directly by customers</div></div>
           <div class="stat-card"><div class="stat-label">Jobs completed</div><div class="stat-value">212</div><div class="stat-sub">6 this week</div></div>
           <div class="stat-card"><div class="stat-label">Rating</div><div class="stat-value">4.9 ⭐</div><div class="stat-sub">From 187 reviews</div></div>
           <div class="stat-card"><div class="stat-label">Response rate</div><div class="stat-value">96%</div><div class="stat-sub">Avg. reply: 4 min</div></div>
@@ -192,12 +192,12 @@
       <!-- EARNINGS -->
       <div class="view" id="view-earnings">
         <div class="greeting"><h2>Earnings</h2></div>
+        <p style="color:var(--ink-soft);font-size:0.9rem;margin-bottom:18px;">Kaarigar doesn't hold or transfer any money — customers pay you directly, in person. These numbers are just a summary of what you've collected, based on jobs marked completed.</p>
         <div class="stat-grid">
-          <div class="stat-card"><div class="stat-label">Wallet balance</div><div class="stat-value">₹4,120</div></div>
-          <div class="stat-card"><div class="stat-label">Total earned (lifetime)</div><div class="stat-value">₹1,42,600</div></div>
-          <div class="stat-card"><div class="stat-label">Pending payout</div><div class="stat-value">₹899</div></div>
+          <div class="stat-card"><div class="stat-label">Collected this month</div><div class="stat-value" id="earningsMonth">₹0</div></div>
+          <div class="stat-card"><div class="stat-label">Total collected (lifetime)</div><div class="stat-value" id="earningsTotal">₹0</div></div>
+          <div class="stat-card"><div class="stat-label">Jobs completed</div><div class="stat-value" id="earningsJobs">0</div></div>
         </div>
-        <button class="add-service-btn" style="border-style:solid;color:var(--ink);">Withdraw to bank account</button>
       </div>
 
       <!-- REVIEWS -->
@@ -292,6 +292,7 @@
       skill: b.service_name,
       price: b.price,
       status: b.status,
+      createdAt: b.created_at,
       date: new Date(b.created_at).toLocaleString('en-IN', {day:'numeric', month:'short', hour:'numeric', minute:'2-digit'}),
       address: 'Address shared after accepting'
     }));
@@ -379,10 +380,11 @@
         <div class="request-avatar" style="background:var(--teal);">${b.initial}</div>
         <div class="request-info">
           <strong>${b.customer}</strong>
-          <span>${b.skill} · ${b.date} · ₹${b.price}</span>
+          <span>${b.skill} · ${b.date} · Collect ₹${b.price} in person</span>
         </div>
         <span class="status-badge status-${b.status}">${statusLabel[b.status]}</span>
         ${b.status === 'accepted' ? `<button class="accept-btn" data-complete="${b.id}">Mark completed</button>` : ''}
+        ${b.status === 'completed' ? `<button class="decline-btn" data-complaint="${b.id}">Report unpaid</button>` : ''}
       </div>`;
   }
 
@@ -403,9 +405,44 @@
         });
         if(error){ alert('Could not update: ' + error.message); return; }
         const b = workerBookings.find(x => x.id === id);
-        if(b){ b.status = 'completed'; renderWorkerBookings(); }
+        if(b){ b.status = 'completed'; renderWorkerBookings(); renderEarnings(); }
       });
     });
+    list.querySelectorAll('[data-complaint]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.complaint;
+        const confirmMsg = "This will suspend the customer's account for 7 days. Only use this if they genuinely didn't pay the agreed amount. Continue?";
+        if(!confirm(confirmMsg)) return;
+        const reason = prompt('Briefly describe what happened (optional):', '');
+        const { error } = await supabaseClient.rpc('file_complaint', {
+          p_booking_id: id, p_reason: reason || null
+        });
+        if(error){ alert('Could not file complaint: ' + error.message); return; }
+        alert('Complaint filed. The customer\'s account has been suspended.');
+      });
+    });
+  }
+
+  function renderEarnings(){
+    const completed = workerBookings.filter(b => b.status === 'completed');
+    const total = completed.reduce((sum, b) => sum + Number(b.price || 0), 0);
+    const now = new Date();
+    const thisMonth = completed
+      .filter(b => {
+        const d = new Date(b.createdAt);
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      })
+      .reduce((sum, b) => sum + Number(b.price || 0), 0);
+
+    const fmt = (n) => '₹' + n.toLocaleString('en-IN');
+    const monthEl = document.getElementById('earningsMonth');
+    const totalEl = document.getElementById('earningsTotal');
+    const jobsEl = document.getElementById('earningsJobs');
+    const overviewEl = document.getElementById('overviewEarningsMonth');
+    if(monthEl) monthEl.textContent = fmt(thisMonth);
+    if(totalEl) totalEl.textContent = fmt(total);
+    if(jobsEl) jobsEl.textContent = completed.length;
+    if(overviewEl) overviewEl.textContent = fmt(thisMonth);
   }
 
   function serviceRow(s){
@@ -525,6 +562,7 @@
     renderRequests();
     renderWorkerBookings();
     renderServices();
+    renderEarnings();
   })();
 })();
 </script>
