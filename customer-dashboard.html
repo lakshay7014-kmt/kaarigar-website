@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#BF3B2C">
-<link rel="icon" href="icons/favicon.png">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Kaarigar">
@@ -51,6 +51,8 @@
   .nav-item.active{background:var(--ink);color:var(--paper);}
   .nav-item .icon{font-size:1.05rem;width:20px;text-align:center;}
   .nav-sep{height:1px;background:var(--line);margin:14px 8px;}
+  #logoutBtn{color:var(--signal);}
+  #logoutBtn:hover{background:rgba(191,59,44,0.1);color:var(--signal);}
   .sidebar-bottom{margin-top:auto;}
   .switch-role{
     display:block;text-align:center;font-size:0.82rem;color:var(--ink-soft);
@@ -188,6 +190,7 @@
     <button class="nav-item" data-view="chat"><span class="icon">💬</span> Messages</button>
     <div class="nav-sep"></div>
     <button class="nav-item" data-view="settings"><span class="icon">⚙️</span> Settings</button>
+    <button class="nav-item" id="logoutBtn"><span class="icon">🚪</span> Log out</button>
     <div class="sidebar-bottom">
       <a class="switch-role" href="worker-dashboard.html">Switch to worker view →</a>
     </div>
@@ -499,6 +502,13 @@
   });
   document.getElementById('menuToggle').addEventListener('click', () => {
     document.getElementById('sidebar').classList.toggle('open');
+  });
+
+  // ---------- Log out ----------
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    if(!confirm('Log out of Kaarigar?')) return;
+    await supabaseClient.auth.signOut();
+    window.location.href = 'index.html';
   });
 
   // ---------- Category chips + search ----------
