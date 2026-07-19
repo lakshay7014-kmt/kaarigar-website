@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#BF3B2C">
+<link rel="icon" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kaarigar">
+<title>Kaarigar — Every skill on your street, finally findable</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --wall:#EDE7D9;
+    --wall-2:#E3D9C4;
+    --paper:#FAF6EC;
+    --ink:#211D18;
+    --ink-soft:#5B5348;
+    --mustard:#E8A63B;
+    --signal:#BF3B2C;
+    --teal:#1B6B68;
+    --leaf:#5C7A4E;
+    --rose:#C4577A;
+    --navy:#223A5E;
+    --line: rgba(33,29,24,0.14);
+    --radius: 10px;
+    --maxw: 1120px;
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--wall);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  body{
+    background-image:
+      radial-gradient(circle at 15% 8%, rgba(255,255,255,0.35), transparent 40%),
+      radial-gradient(circle at 85% 92%, rgba(255,255,255,0.25), transparent 45%);
+  }
+  body.modal-open{overflow:hidden;}
+
+  h1,h2,h3,.display{
+    font-family:'Baloo 2', sans-serif;
+    font-weight:700;
+    letter-spacing:-0.01em;
+    margin:0;
+  }
+
+  .mono{
+    font-family:'IBM Plex Mono', monospace;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    font-size:0.72rem;
+    font-weight:600;
+  }
+
+  a{color:inherit;}
+  img{max-width:100%;display:block;}
+  button{font-family:inherit;}
+
+  :focus-visible{
+    outline:3px solid var(--signal);
+    outline-offset:3px;
+  }
+
+  .wrap{
+    max-width:var(--maxw);
+    margin:0 auto;
+    padding:0 24px;
+  }
+
+  /* ---------- HEADER ---------- */
+  header{
+    position:sticky;
+    top:0;
+    z-index:50;
+    background:rgba(237,231,217,0.9);
+    backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--line);
+  }
+  .nav{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:16px 24px;
+    max-width:var(--maxw);
+    margin:0 auto;
+  }
+  .logo{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    text-decoration:none;
+    color:var(--ink);
+    background:none;
+    border:none;
+    cursor:pointer;
+    padding:0;
+  }
+  .logo-mark{
+    width:36px;height:36px;
+    background:var(--signal);
+    border-radius:8px;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--paper);
+    font-family:'Baloo 2',sans-serif;
+    font-weight:800;
+    font-size:1.15rem;
+    transform:rotate(-4deg);
+    box-shadow:2px 2px 0 rgba(33,29,24,0.25);
+  }
+  .logo-word{
+    font-family:'Baloo 2',sans-serif;
+    font-weight:700;
+    font-size:1.25rem;
+  }
+  .nav-right{display:flex;align-items:center;gap:22px;}
+  .nav-links{
+    display:flex;
+    gap:28px;
+    list-style:none;
+    margin:0;padding:0;
+    font-size:0.95rem;
+    font-weight:500;
+  }
+  .nav-links a{text-decoration:none;opacity:0.8;background:none;border:none;cursor:pointer;font-size:inherit;font-weight:inherit;color:inherit;padding:0;}
+  .nav-links a:hover{opacity:1;}
+  .nav-login{
+    background:none;
+    border:none;
+    font-weight:600;
+    font-size:0.92rem;
+    cursor:pointer;
+    color:var(--ink);
+    text-decoration:underline;
+    text-underline-offset:3px;
+  }
+  .nav-cta{
+    background:var(--ink);
+    color:var(--paper);
+    border:none;
+    padding:10px 18px;
+    border-radius:8px;
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:0.9rem;
+    cursor:pointer;
+  }
+  .nav-cta:hover{background:var(--signal);}
+  .nav-toggle{display:none;background:none;border:none;cursor:pointer;font-size:1.3rem;}
+
+  @media(max-width:800px){
+    .nav-links{
+      position:fixed;top:68px;left:0;right:0;
+      background:var(--paper);
+      flex-direction:column;
+      gap:0;
+      border-bottom:1px solid var(--line);
+      max-height:0;
+      overflow:hidden;
+      transition:max-height 0.25s ease;
+    }
+    .nav-links.open{max-height:300px;}
+    .nav-links li{border-top:1px solid var(--line);}
+    .nav-links a{display:block;padding:16px 24px;}
+    .nav-toggle{display:block;}
+    .nav-right .nav-login{display:none;}
+  }
+
+  /* ---------- HERO ---------- */
+  .hero{padding:72px 24px 56px;}
+  .hero-inner{max-width:var(--maxw);margin:0 auto;text-align:left;}
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:8px;
+    background:var(--paper);border:1px solid var(--line);
+    padding:6px 14px;border-radius:999px;color:var(--ink-soft);margin-bottom:22px;
+  }
+  .eyebrow-dot{width:8px;height:8px;border-radius:50%;background:var(--leaf);}
+  h1.hero-title{font-size:clamp(2.4rem, 5.5vw, 4.2rem);line-height:1.04;max-width:16ch;}
+  h1.hero-title .accent{color:var(--signal);}
+  .hero-sub{margin:26px 0 0;font-size:1.15rem;color:var(--ink-soft);max-width:52ch;}
+  .hero-ctas{display:flex;flex-wrap:wrap;gap:14px;margin-top:34px;}
+  .btn{
+    font-family:'Inter',sans-serif;font-weight:600;font-size:1rem;
+    padding:14px 24px;border-radius:8px;border:2px solid var(--ink);
+    cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:8px;
+    transition:transform 0.15s ease, background 0.15s ease;
+  }
+  .btn-primary{background:var(--signal);border-color:var(--signal);color:var(--paper);}
+  .btn-primary:hover{transform:translate(-2px,-2px);box-shadow:4px 4px 0 var(--ink);}
+  .btn-secondary{background:transparent;color:var(--ink);}
+  .btn-secondary:hover{transform:translate(-2px,-2px);box-shadow:4px 4px 0 var(--teal);border-color:var(--teal);}
+  .hero-note{margin-top:18px;font-size:0.88rem;color:var(--ink-soft);}
+
+  /* ---------- SIGNBOARD STRIP ---------- */
+  .signboards{padding:64px 24px 80px;background:var(--wall-2);border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+  .section-head{max-width:var(--maxw);margin:0 auto 40px;}
+  .section-head h2{font-size:clamp(1.7rem,3.4vw,2.4rem);}
+  .section-head p{color:var(--ink-soft);margin-top:10px;font-size:1.05rem;max-width:56ch;}
+  .board-grid{max-width:var(--maxw);margin:0 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:22px;}
+  .board{
+    position:relative;padding:22px 16px 18px;border-radius:6px;
+    border:3px solid rgba(0,0,0,0.16);color:var(--paper);text-align:center;
+    box-shadow:4px 5px 0 rgba(33,29,24,0.22);
+    transition:transform 0.2s ease, box-shadow 0.2s ease;
+    cursor:default;
+  }
+  .board:hover{transform:rotate(0deg) translateY(-3px);box-shadow:5px 7px 0 rgba(33,29,24,0.28);}
+  .board::before,.board::after{content:"";position:absolute;top:8px;width:6px;height:6px;border-radius:50%;background:rgba(0,0,0,0.35);}
+  .board::before{left:10px;}
+  .board::after{right:10px;}
+  .board-icon{font-size:1.8rem;margin-bottom:8px;}
+  .board-name{font-family:'Baloo 2',sans-serif;font-weight:700;font-size:1.05rem;}
+  .board:nth-child(1){background:var(--mustard);transform:rotate(-3deg);}
+  .board:nth-child(2){background:var(--signal);transform:rotate(2deg);}
+  .board:nth-child(3){background:var(--teal);transform:rotate(-1.5deg);}
+  .board:nth-child(4){background:var(--leaf);transform:rotate(2.5deg);}
+  .board:nth-child(5){background:var(--rose);transform:rotate(-2deg);}
+  .board:nth-child(6){background:var(--navy);transform:rotate(1.5deg);}
+  .board:nth-child(7){background:var(--signal);transform:rotate(-2.5deg);}
+  .board:nth-child(8){background:var(--teal);transform:rotate(3deg);}
+  .board:nth-child(9){background:var(--mustard);transform:rotate(-1deg);}
+  .board:nth-child(10){background:var(--rose);transform:rotate(2deg);}
+  .board:nth-child(11){background:var(--leaf);transform:rotate(-2.5deg);}
+  .board:nth-child(12){background:var(--navy);transform:rotate(1deg);}
+
+  /* ---------- HOW IT WORKS ---------- */
+  .how{padding:80px 24px;}
+  .tabs{display:inline-flex;background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:4px;margin-bottom:40px;}
+  .tab-btn{
+    font-family:'Inter',sans-serif;font-weight:600;font-size:0.92rem;
+    padding:10px 20px;border-radius:999px;border:none;background:transparent;
+    color:var(--ink-soft);cursor:pointer;
+  }
+  .tab-btn[aria-selected="true"]{background:var(--ink);color:var(--paper);}
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;}
+  @media(max-width:800px){.steps{grid-template-columns:1fr;}}
+  .step{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:26px;}
+  .step-num{font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--signal);font-size:0.85rem;margin-bottom:12px;display:block;}
+  .step h3{font-size:1.15rem;margin-bottom:8px;}
+  .step p{color:var(--ink-soft);font-size:0.96rem;margin:0;}
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  /* ---------- MISSION ---------- */
+  .mission{padding:80px 24px;background:var(--navy);color:var(--paper);}
+  .mission-inner{max-width:760px;margin:0 auto;text-align:left;}
+  .mission h2{font-size:clamp(1.7rem,3.6vw,2.5rem);line-height:1.2;}
+  .mission p{margin-top:18px;font-size:1.08rem;color:rgba(250,246,236,0.82);max-width:60ch;}
+
+  /* ---------- AI TEASER ---------- */
+  .ai-teaser{padding:80px 24px;}
+  .ai-grid{max-width:var(--maxw);margin:0 auto;display:grid;grid-template-columns:1.1fr 1fr;gap:48px;align-items:center;}
+  @media(max-width:800px){.ai-grid{grid-template-columns:1fr;}}
+  .ai-copy h2{font-size:clamp(1.6rem,3.2vw,2.2rem);}
+  .ai-copy p{color:var(--ink-soft);margin-top:16px;font-size:1.05rem;}
+  .ai-example{background:var(--ink);color:var(--paper);border-radius:var(--radius);padding:28px;font-family:'IBM Plex Mono',monospace;}
+  .ai-example .query{background:rgba(255,255,255,0.08);border-radius:8px;padding:14px 16px;font-size:0.92rem;margin-bottom:16px;border-left:3px solid var(--mustard);}
+  .ai-example .result{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.1);font-size:0.85rem;}
+  .ai-example .result:last-child{border-bottom:none;}
+  .ai-example .result span:last-child{color:var(--mustard);}
+
+  /* ---------- FINAL CTA ---------- */
+  .signup{padding:88px 24px;background:var(--wall-2);border-top:1px solid var(--line);}
+  .signup-card{
+    max-width:640px;margin:0 auto;background:var(--paper);border:1px solid var(--line);
+    border-radius:var(--radius);padding:42px 36px;text-align:center;
+    box-shadow:6px 6px 0 rgba(33,29,24,0.12);
+  }
+  .signup-card h2{font-size:clamp(1.6rem,3.2vw,2.1rem);}
+  .signup-card p{color:var(--ink-soft);margin-top:12px;}
+  .signup-card .hero-ctas{justify-content:center;margin-top:26px;}
+  .waitlist-toggle{
+    margin-top:22px;background:none;border:none;color:var(--ink-soft);
+    text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-size:0.9rem;
+  }
+  .waitlist-box{display:none;margin-top:20px;}
+  .waitlist-box.open{display:block;}
+  form.waitlist-form{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+  .waitlist-form input[type="email"]{
+    flex:1;min-width:220px;padding:12px 14px;border-radius:8px;border:2px solid var(--line);
+    font-family:'Inter',sans-serif;font-size:0.95rem;background:var(--paper);
+  }
+  .waitlist-form input[type="email"]:focus{border-color:var(--signal);}
+  .waitlist-form button{padding:12px 18px;border-radius:8px;border:none;background:var(--ink);color:var(--paper);font-weight:600;font-size:0.95rem;cursor:pointer;}
+  .waitlist-form button:hover{background:var(--signal);}
+  .waitlist-success{display:none;margin-top:14px;padding:12px 14px;background:rgba(92,122,78,0.15);border:1px solid var(--leaf);border-radius:8px;color:#3C5A32;font-weight:600;font-size:0.9rem;}
+  .waitlist-success.show{display:block;}
+
+  /* ---------- FOOTER ---------- */
+  footer{padding:48px 24px;text-align:center;}
+
+  /* ---------- INSTALL BANNER ---------- */
+  .install-banner{
+    position:fixed;left:16px;right:16px;bottom:16px;z-index:90;
+    background:var(--ink);color:var(--paper);border-radius:12px;
+    padding:16px 18px;display:none;align-items:center;gap:14px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.3);
+    max-width:520px;margin:0 auto;
+  }
+  .install-banner.show{display:flex;}
+  .install-banner-text{flex:1;font-size:0.88rem;line-height:1.4;}
+  .install-banner-text strong{display:block;font-family:'Baloo 2',sans-serif;font-size:1rem;margin-bottom:2px;}
+  .install-banner-actions{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+  .install-btn{
+    background:var(--signal);color:var(--paper);border:none;
+    padding:9px 16px;border-radius:7px;font-weight:600;font-size:0.88rem;cursor:pointer;
+  }
+  .install-btn:hover{background:var(--mustard);}
+  .install-dismiss{background:none;border:none;color:var(--paper);font-size:1.2rem;cursor:pointer;opacity:0.7;padding:4px;}
+  .install-dismiss:hover{opacity:1;}
+  footer .logo{justify-content:center;margin-bottom:16px;}
+  footer p{color:var(--ink-soft);font-size:0.88rem;margin:6px 0;}
+
+  /* ---------- AUTH MODAL ---------- */
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(33,29,24,0.55);
+    display:none;align-items:center;justify-content:center;
+    z-index:100;padding:20px;
+  }
+  .modal-overlay.open{display:flex;}
+  .modal-box{
+    background:var(--paper);border-radius:14px;max-width:440px;width:100%;
+    padding:32px 28px;position:relative;box-shadow:0 20px 50px rgba(33,29,24,0.35);
+    max-height:90vh;overflow-y:auto;
+  }
+  .modal-close{
+    position:absolute;top:16px;right:16px;background:none;border:none;
+    font-size:1.4rem;cursor:pointer;color:var(--ink-soft);line-height:1;padding:4px;
+  }
+  .modal-close:hover{color:var(--ink);}
+  .modal-back{
+    background:none;border:none;cursor:pointer;color:var(--ink-soft);
+    font-weight:600;font-size:0.88rem;margin-bottom:14px;padding:0;
+    display:inline-flex;align-items:center;gap:4px;
+  }
+  .modal-back:hover{color:var(--ink);}
+  .modal-step{display:none;}
+  .modal-step.active{display:block;}
+  .modal-eyebrow{margin-bottom:6px;}
+  .modal-box h3{font-size:1.4rem;margin-bottom:8px;}
+  .modal-box .modal-sub{color:var(--ink-soft);font-size:0.94rem;margin-bottom:22px;}
+
+  .role-cards{display:flex;flex-direction:column;gap:14px;}
+  .role-card{
+    display:flex;align-items:center;gap:14px;text-align:left;
+    padding:18px;border:2px solid var(--line);border-radius:10px;
+    background:var(--wall);cursor:pointer;width:100%;
+  }
+  .role-card:hover{border-color:var(--signal);background:var(--paper);}
+  .role-card.selected{border-color:var(--signal);background:var(--paper);box-shadow:0 0 0 1px var(--signal);}
+  .role-card .role-icon{
+    width:44px;height:44px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+    font-size:1.4rem;flex-shrink:0;
+  }
+  .role-card[data-select-role="customer"] .role-icon{background:var(--mustard);}
+  .role-card[data-select-role="worker"] .role-icon{background:var(--teal);color:var(--paper);}
+  .role-card strong{display:block;font-size:1rem;font-family:'Baloo 2',sans-serif;}
+  .role-card span{display:block;color:var(--ink-soft);font-size:0.86rem;margin-top:2px;}
+
+  .google-btn{
+    display:flex;align-items:center;justify-content:center;gap:10px;
+    width:100%;padding:14px;border-radius:8px;border:2px solid var(--line);
+    background:var(--paper);font-weight:600;font-size:1rem;cursor:pointer;
+    font-family:'Inter',sans-serif;color:var(--ink);
+  }
+  .google-btn:hover{border-color:var(--ink);background:var(--wall);}
+  .google-btn:disabled{opacity:0.6;cursor:not-allowed;}
+
+  .form-field{margin-bottom:18px;text-align:left;}
+  .form-field label{display:block;font-weight:600;font-size:0.88rem;margin-bottom:6px;}
+  .form-field input{
+    width:100%;padding:13px 14px;border-radius:8px;border:2px solid var(--line);
+    font-size:1rem;font-family:'Inter',sans-serif;background:var(--wall);
+  }
+  .form-field input:focus{border-color:var(--signal);background:var(--paper);}
+  .phone-row{display:flex;gap:8px;}
+  .phone-row .cc{
+    flex:0 0 64px;padding:13px 8px;border-radius:8px;border:2px solid var(--line);
+    background:var(--wall);text-align:center;font-family:'IBM Plex Mono',monospace;font-size:0.9rem;
+  }
+  .otp-row{display:flex;gap:10px;justify-content:center;margin-bottom:18px;}
+  .otp-row input{
+    width:52px;height:56px;text-align:center;font-size:1.3rem;font-weight:700;
+    border-radius:8px;border:2px solid var(--line);background:var(--wall);font-family:'IBM Plex Mono',monospace;
+  }
+  .otp-row input:focus{border-color:var(--signal);background:var(--paper);}
+  .modal-submit{
+    width:100%;padding:14px;border-radius:8px;border:none;background:var(--signal);
+    color:var(--paper);font-weight:600;font-size:1rem;cursor:pointer;margin-top:4px;
+  }
+  .modal-submit:hover{background:var(--ink);}
+  .modal-submit:disabled{background:var(--line);color:var(--ink-soft);cursor:not-allowed;}
+  .modal-error{color:var(--signal);font-size:0.86rem;margin-top:8px;display:none;}
+  .modal-error.show{display:block;}
+  .resend-note{text-align:center;font-size:0.85rem;color:var(--ink-soft);margin-top:14px;}
+  .resend-note button{background:none;border:none;color:var(--signal);font-weight:600;cursor:pointer;text-decoration:underline;}
+  .swap-mode{text-align:center;font-size:0.88rem;color:var(--ink-soft);margin-top:20px;}
+  .swap-mode button{background:none;border:none;color:var(--signal);font-weight:600;cursor:pointer;text-decoration:underline;}
+
+  .success-icon{
+    width:56px;height:56px;border-radius:50%;background:var(--leaf);color:var(--paper);
+    display:flex;align-items:center;justify-content:center;font-size:1.6rem;margin:0 auto 18px;
+  }
+  .modal-step-success{text-align:center;}
+
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important;scroll-behavior:auto !important;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <nav class="nav">
+    <button class="logo" id="logoBtn">
+      <span class="logo-mark">क</span>
+      <span class="logo-word">Kaarigar</span>
+    </button>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="#signboards">Trades</a></li>
+      <li><a href="#how">How it works</a></li>
+      <li><a href="#mission">Why we're building this</a></li>
+    </ul>
+    <div class="nav-right">
+      <button class="nav-login" id="navLogin">Log in</button>
+      <button class="nav-cta" id="navSignup">Get started</button>
+    </div>
+    <button class="nav-toggle" id="navToggle" aria-label="Toggle menu" aria-expanded="false">☰</button>
+  </nav>
+</header>
+
+<main id="top">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-inner">
+      <span class="eyebrow"><span class="eyebrow-dot"></span> <span class="mono">Building now — early access opening soon</span></span>
+      <h1 class="hero-title">Every skill on your street, <span class="accent">finally findable.</span></h1>
+      <p class="hero-sub">Kaarigar connects skilled workers — tailors, electricians, tutors, cooks, and more — with people nearby who need them. No contacts needed to find work. No guesswork to find help.</p>
+      <div class="hero-ctas">
+        <button class="btn btn-primary" data-open-signup="worker">I have a skill →</button>
+        <button class="btn btn-secondary" data-open-signup="customer">I need something done →</button>
+      </div>
+      <p class="hero-note">Free to join. Set up your board or post what you need in a couple of minutes.</p>
+    </div>
+  </section>
+
+  <!-- SIGNBOARDS -->
+  <section class="signboards" id="signboards">
+    <div class="section-head">
+      <h2>Every trade has a signboard here.</h2>
+      <p>From tailoring to tutoring — if it's a skill, there's a place for it on Kaarigar.</p>
+    </div>
+    <div class="board-grid">
+      <div class="board"><div class="board-icon">✂️</div><div class="board-name">Tailoring</div></div>
+      <div class="board"><div class="board-icon">⚡</div><div class="board-name">Electrician</div></div>
+      <div class="board"><div class="board-icon">🔧</div><div class="board-name">Plumbing</div></div>
+      <div class="board"><div class="board-icon">📘</div><div class="board-name">Tutoring</div></div>
+      <div class="board"><div class="board-icon">🍲</div><div class="board-name">Home Cooking</div></div>
+      <div class="board"><div class="board-icon">💇</div><div class="board-name">Beautician</div></div>
+      <div class="board"><div class="board-icon">🖌️</div><div class="board-name">Painting</div></div>
+      <div class="board"><div class="board-icon">🪚</div><div class="board-name">Carpentry</div></div>
+      <div class="board"><div class="board-icon">🌿</div><div class="board-name">Mehndi Artist</div></div>
+      <div class="board"><div class="board-icon">❄️</div><div class="board-name">AC & Appliance Repair</div></div>
+      <div class="board"><div class="board-icon">📱</div><div class="board-name">Mobile Repair</div></div>
+      <div class="board"><div class="board-icon">🚗</div><div class="board-name">Driving</div></div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="how" id="how">
+    <div class="section-head" style="text-align:center;">
+      <h2>How it works</h2>
+      <div class="tabs" role="tablist" aria-label="How it works for" style="margin-top:24px;">
+        <button class="tab-btn" role="tab" aria-selected="true" data-panel="customer">For customers</button>
+        <button class="tab-btn" role="tab" aria-selected="false" data-panel="worker">For workers</button>
+      </div>
+    </div>
+
+    <div class="panel active" id="panel-customer">
+      <div class="steps">
+        <div class="step">
+          <span class="step-num">STEP 1</span>
+          <h3>Say what you need</h3>
+          <p>Type it or speak it, in your own words — "need someone to fix my fan today" works just fine.</p>
+        </div>
+        <div class="step">
+          <span class="step-num">STEP 2</span>
+          <h3>Get matched nearby</h3>
+          <p>See workers ranked by how well they fit, how close they are, and how their past customers rated them.</p>
+        </div>
+        <div class="step">
+          <span class="step-num">STEP 3</span>
+          <h3>Book and pay safely</h3>
+          <p>Chat, agree on the work, and pay through the app. Your payment is only released once the job is done.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-worker">
+      <div class="steps">
+        <div class="step">
+          <span class="step-num">STEP 1</span>
+          <h3>Set up your board</h3>
+          <p>Add your skills, your prices, and photos of your work. Takes a couple of minutes, no online experience needed.</p>
+        </div>
+        <div class="step">
+          <span class="step-num">STEP 2</span>
+          <h3>Get found nearby</h3>
+          <p>Customers looking for exactly what you do, close to where you work, can find and book you directly.</p>
+        </div>
+        <div class="step">
+          <span class="step-num">STEP 3</span>
+          <h3>Get paid on time</h3>
+          <p>No chasing payment after the job. It's held safely and released to you the moment the work is confirmed done.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MISSION -->
+  <section class="mission" id="mission">
+    <div class="mission-inner">
+      <h2>Skill isn't the problem. Being found is.</h2>
+      <p>Most skilled workers we've talked to don't struggle with the work itself — they struggle with being seen. No contacts to ask around, no online presence, no easy way for someone three streets over to know they exist. Kaarigar exists to close that gap: putting real skill in front of the people who need it, without either side needing to already know someone.</p>
+    </div>
+  </section>
+
+  <!-- AI TEASER -->
+  <section class="ai-teaser">
+    <div class="ai-grid">
+      <div class="ai-copy">
+        <h2>It understands how you actually talk.</h2>
+        <p>Search in plain Hindi, English, or a mix of both. Say what you need out loud if typing's not convenient. Kaarigar reads the intent behind the words — not just keywords — and ranks results by real fit: the right skill, close by, with a track record you can trust.</p>
+      </div>
+      <div class="ai-example">
+        <div class="query">"mera AC repair karna hai, aaj hi chahiye"</div>
+        <div class="result"><span>Ramesh K. — AC Repair</span><span>0.8 km · ★4.9</span></div>
+        <div class="result"><span>Sunita Appliance Care</span><span>1.2 km · ★4.7</span></div>
+        <div class="result"><span>Vikram Cooling Works</span><span>1.6 km · ★4.6</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FINAL CTA -->
+  <section class="signup" id="signup">
+    <div class="signup-card">
+      <h2>Ready to get started?</h2>
+      <p>Create your account as a worker or a customer — takes about a minute.</p>
+      <div class="hero-ctas">
+        <button class="btn btn-primary" data-open-signup="worker">I have a skill →</button>
+        <button class="btn btn-secondary" data-open-signup="customer">I need something done →</button>
+      </div>
+      <button class="waitlist-toggle" id="waitlistToggle">Not ready yet? Just send me updates</button>
+      <div class="waitlist-box" id="waitlistBox">
+        <form class="waitlist-form" id="waitlistForm">
+          <label for="wl-email" style="position:absolute;left:-9999px;">Email address</label>
+          <input type="email" id="wl-email" placeholder="you@example.com" required>
+          <button type="submit">Notify me</button>
+        </form>
+        <div class="waitlist-success" id="waitlistSuccess">You're on the list. We'll email you when access opens.</div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <button class="logo" style="pointer-events:none;">
+    <span class="logo-mark">क</span>
+    <span class="logo-word">Kaarigar</span>
+  </button>
+  <p>Connecting skilled people with nearby work opportunities.</p>
+  <p>&copy; 2026 Kaarigar. Building in India, one city at a time.</p>
+</footer>
+
+<!-- ================= INSTALL APP BANNER ================= -->
+<div class="install-banner" id="installBanner">
+  <div class="install-banner-text">
+    <strong>Install Kaarigar</strong>
+    <span id="installBannerSub">Add it to your home screen — opens like an app, no browser bar.</span>
+  </div>
+  <div class="install-banner-actions">
+    <button class="install-btn" id="installBtn">Install</button>
+    <button class="install-dismiss" id="installDismiss" aria-label="Dismiss">&times;</button>
+  </div>
+</div>
+
+<!-- ================= AUTH MODAL ================= -->
+<div class="modal-overlay" id="modalOverlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal-box">
+    <button class="modal-close" id="modalClose" aria-label="Close">&times;</button>
+
+    <!-- STEP: Google sign-in entry -->
+    <div class="modal-step active" data-step="google">
+      <span class="mono modal-eyebrow" style="color:var(--ink-soft);">GET STARTED</span>
+      <h3 id="modalTitle">Sign in to Kaarigar</h3>
+      <p class="modal-sub">One tap with your Google account — no password, no waiting for a code.</p>
+      <button class="google-btn" id="googleSignInBtn">
+        <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
+          <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/>
+          <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
+          <path fill="#4CAF50" d="M24 44c5.5 0 10.4-1.9 14.2-5.1l-6.6-5.4c-2 1.4-4.6 2.3-7.6 2.3-5.2 0-9.6-3.3-11.2-7.9l-6.6 5.1C9.6 39.6 16.2 44 24 44z"/>
+          <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.2-4.1 5.6l6.6 5.4C41.9 35.9 44 30.4 44 24c0-1.3-.1-2.7-.4-3.5z"/>
+        </svg>
+        <span>Continue with Google</span>
+      </button>
+      <div class="modal-error" id="googleError"></div>
+    </div>
+
+    <!-- STEP: complete profile (first-time Google users only) -->
+    <div class="modal-step" data-step="complete-profile">
+      <span class="mono modal-eyebrow" style="color:var(--ink-soft);">ONE LAST THING</span>
+      <h3>Complete your profile</h3>
+      <p class="modal-sub" id="googleGreeting">Welcome!</p>
+
+      <div class="role-cards" style="margin-bottom:18px;">
+        <button class="role-card" data-select-role="customer">
+          <span class="role-icon">🏠</span>
+          <span><strong>I need work done</strong><span>Find and book skilled workers nearby</span></span>
+        </button>
+        <button class="role-card" data-select-role="worker">
+          <span class="role-icon">🛠️</span>
+          <span><strong>I offer a skill</strong><span>Get found by customers near you</span></span>
+        </button>
+      </div>
+
+      <div class="form-field">
+        <label for="ageInput">Age</label>
+        <input type="number" id="ageInput" inputmode="numeric" min="16" max="100" placeholder="e.g. 28">
+      </div>
+      <div class="modal-error" id="profileError">Please select a role and enter a valid age (16+).</div>
+      <button class="modal-submit" id="completeProfileBtn">Finish setup</button>
+    </div>
+
+    <!-- STEP: success -->
+    <div class="modal-step modal-step-success" data-step="success">
+      <div class="success-icon" id="successIcon">✓</div>
+      <h3 id="successTitle">You're in!</h3>
+      <p class="modal-sub" id="successSub">Redirecting you now…</p>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // ============================================================
+  // BACKEND CONFIG — replace these two values with your own
+  // Supabase project's URL and "anon public" key
+  // (Supabase dashboard → Project Settings → API)
+  // ============================================================
+  const SUPABASE_URL = 'https://wbygseregfnudvuhxklb.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndieWdzZXJlZ2ZudWR2dWh4a2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyNTc3NjIsImV4cCI6MjA5OTgzMzc2Mn0.6VlGmBR1nt0CXPClMDRgbtTiVfPl7cim2rgEvkl23Fs';
+  const BACKEND_READY = SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY';
+  const supabaseClient = BACKEND_READY ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+  if(!BACKEND_READY){
+    document.addEventListener('DOMContentLoaded', () => {
+      const bar = document.createElement('div');
+      bar.style.cssText = 'background:#BF3B2C;color:#fff;text-align:center;font-size:0.82rem;padding:8px 16px;font-family:sans-serif;';
+      bar.textContent = '⚠️ Backend not connected yet — add your Supabase URL & key at the top of index.html to enable real signup/login.';
+      document.body.prepend(bar);
+    });
+  }
+</script>
+<script>
+  (function(){
+    // ---------- Mobile nav ----------
+    const navToggle = document.getElementById('navToggle');
+    const navLinks = document.getElementById('navLinks');
+    navToggle.addEventListener('click', () => {
+      const open = navLinks.classList.toggle('open');
+      navToggle.setAttribute('aria-expanded', open);
+    });
+    navLinks.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', () => {
+        navLinks.classList.remove('open');
+        navToggle.setAttribute('aria-expanded', 'false');
+      });
+    });
+    document.getElementById('logoBtn').addEventListener('click', () => {
+      window.scrollTo({top:0, behavior:'smooth'});
+    });
+
+    // ---------- How-it-works tabs ----------
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabBtns.forEach(b => b.setAttribute('aria-selected', 'false'));
+        btn.setAttribute('aria-selected', 'true');
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        document.getElementById('panel-' + btn.dataset.panel).classList.add('active');
+      });
+    });
+
+    // ---------- Waitlist fallback form ----------
+    const waitlistToggle = document.getElementById('waitlistToggle');
+    const waitlistBox = document.getElementById('waitlistBox');
+    waitlistToggle.addEventListener('click', () => {
+      waitlistBox.classList.toggle('open');
+    });
+    const waitlistForm = document.getElementById('waitlistForm');
+    const waitlistSuccess = document.getElementById('waitlistSuccess');
+    waitlistForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      // In production: POST { email } to the waitlist API endpoint.
+      waitlistSuccess.classList.add('show');
+      waitlistForm.reset();
+    });
+
+
+    // ---------- Google Auth modal ----------
+    const overlay = document.getElementById('modalOverlay');
+    const steps = document.querySelectorAll('.modal-step');
+    let lastFocused = null;
+    let selectedRole = null;
+    let pendingSession = null;
+
+    function showStep(name){
+      steps.forEach(s => s.classList.toggle('active', s.dataset.step === name));
+      const firstInput = overlay.querySelector('.modal-step.active input, .modal-step.active .role-card, .modal-step.active button');
+      if(firstInput) setTimeout(() => firstInput.focus(), 50);
+    }
+
+    function openModal(){
+      lastFocused = document.activeElement;
+      overlay.classList.add('open');
+      document.body.classList.add('modal-open');
+      document.getElementById('googleError').textContent = '';
+      showStep('google');
+    }
+
+    function closeModal(){
+      overlay.classList.remove('open');
+      document.body.classList.remove('modal-open');
+      if(lastFocused) lastFocused.focus();
+    }
+
+    document.getElementById('navSignup').addEventListener('click', () => openModal());
+    document.getElementById('navLogin').addEventListener('click', () => openModal());
+    document.querySelectorAll('[data-open-signup]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        // Remember the intended role so it carries through the Google
+        // redirect round-trip (in-memory state doesn't survive a full
+        // page navigation to Google and back, a URL param does).
+        sessionRoleIntent = btn.dataset.openSignup;
+        openModal();
+      });
+    });
+
+    document.getElementById('modalClose').addEventListener('click', closeModal);
+    overlay.addEventListener('click', (e) => { if(e.target === overlay) closeModal(); });
+    document.addEventListener('keydown', (e) => {
+      if(e.key === 'Escape' && overlay.classList.contains('open')) closeModal();
+    });
+
+    let sessionRoleIntent = new URLSearchParams(window.location.search).get('intent');
+
+    // ---------- Google sign-in ----------
+    document.getElementById('googleSignInBtn').addEventListener('click', async () => {
+      if(!BACKEND_READY){
+        document.getElementById('googleError').textContent = 'Backend not connected yet — add your Supabase URL & key at the top of index.html.';
+        return;
+      }
+      const btn = document.getElementById('googleSignInBtn');
+      btn.disabled = true;
+
+      const redirectUrl = window.location.origin + window.location.pathname +
+        (sessionRoleIntent ? '?intent=' + sessionRoleIntent : '');
+
+      const { error } = await supabaseClient.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: redirectUrl }
+      });
+
+      if(error){
+        document.getElementById('googleError').textContent = error.message;
+        btn.disabled = false;
+      }
+      // On success, the browser navigates away to Google — nothing more to do here.
+    });
+
+    // ---------- Role selection in the "complete profile" step ----------
+    document.querySelectorAll('[data-select-role]').forEach(card => {
+      card.addEventListener('click', () => {
+        selectedRole = card.dataset.selectRole;
+        document.querySelectorAll('[data-select-role]').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+      });
+    });
+
+    // ---------- Complete profile (first-time Google sign-in) ----------
+    document.getElementById('completeProfileBtn').addEventListener('click', async () => {
+      const ageVal = document.getElementById('ageInput').value.trim();
+      const errorEl = document.getElementById('profileError');
+      const ageOk = Number(ageVal) >= 16 && Number(ageVal) <= 100;
+
+      if(!selectedRole || !ageOk){
+        errorEl.classList.add('show');
+        return;
+      }
+      errorEl.classList.remove('show');
+
+      const btn = document.getElementById('completeProfileBtn');
+      btn.disabled = true;
+      btn.textContent = 'Please wait…';
+
+      const user = pendingSession.user;
+      const displayName = (user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name)) || user.email;
+
+      try{
+        const { data: profile, error: profileErr } = await supabaseClient
+          .from('profiles')
+          .insert({
+            user_id: user.id,
+            name: displayName,
+            age: Number(ageVal),
+            email: user.email,
+            role: selectedRole
+          })
+          .select()
+          .single();
+
+        if(profileErr) throw profileErr;
+
+        if(selectedRole === 'worker'){
+          const { error: workerErr } = await supabaseClient
+            .from('workers')
+            .insert({ profile_id: profile.id, category: 'General', name: displayName });
+          if(workerErr) throw workerErr;
+        }
+
+        goToDashboard(selectedRole, displayName);
+      } catch(err){
+        errorEl.textContent = err.message || 'Something went wrong. Please try again.';
+        errorEl.classList.add('show');
+        btn.disabled = false;
+        btn.textContent = 'Finish setup';
+      }
+    });
+
+    function goToDashboard(role, name){
+      document.getElementById('successTitle').textContent = 'You\'re in, ' + (name || 'there') + '!';
+      showStep('success');
+      const target = role === 'worker' ? 'worker-dashboard.html' : 'customer-dashboard.html';
+      setTimeout(() => { window.location.href = target; }, 900);
+    }
+
+    // ---------- Handle the return trip from Google (or an existing session) ----------
+    async function handleSession(session){
+      pendingSession = session;
+
+      const { data: profile, error } = await supabaseClient
+        .from('profiles')
+        .select('id, name, role, suspended_until')
+        .eq('user_id', session.user.id)
+        .maybeSingle();
+
+      if(error){ console.error(error); return; }
+
+      if(profile){
+        const isSuspended = profile.role === 'customer' && profile.suspended_until && new Date(profile.suspended_until) > new Date();
+        if(isSuspended){
+          openModal();
+          document.querySelectorAll('.modal-step').forEach(s => s.classList.remove('active'));
+          const untilStr = new Date(profile.suspended_until).toLocaleDateString('en-IN', { day:'numeric', month:'long' });
+          document.getElementById('successTitle').textContent = 'Account suspended';
+          document.getElementById('successSub').textContent =
+            'A worker reported not being paid the agreed amount for a job. Your account is suspended until ' + untilStr + '.';
+          document.getElementById('successIcon').textContent = '⚠️';
+          document.getElementById('successIcon').style.background = 'var(--signal)';
+          showStep('success');
+          return;
+        }
+        // Returning user — straight to their dashboard
+        openModal();
+        goToDashboard(profile.role, profile.name);
+      } else {
+        // First Google sign-in — ask role + age
+        const displayName = (session.user.user_metadata && (session.user.user_metadata.full_name || session.user.user_metadata.name)) || session.user.email;
+        document.getElementById('googleGreeting').textContent = 'Welcome, ' + displayName + '! Just need a couple more details.';
+        if(sessionRoleIntent === 'worker' || sessionRoleIntent === 'customer'){
+          selectedRole = sessionRoleIntent;
+          const card = document.querySelector('[data-select-role="' + sessionRoleIntent + '"]');
+          if(card) card.classList.add('selected');
+        }
+        openModal();
+        showStep('complete-profile');
+      }
+    }
+
+    if(BACKEND_READY){
+      supabaseClient.auth.getSession().then(({ data }) => {
+        if(data.session) handleSession(data.session);
+      });
+      supabaseClient.auth.onAuthStateChange((event, session) => {
+        if(event === 'SIGNED_IN' && session) handleSession(session);
+      });
+    }
+  })();
+</script>
+
+<script>
+  // ---------- Install as app (PWA) ----------
+  (function(){
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if(isStandalone) return; // already running as an installed app
+
+    const banner = document.getElementById('installBanner');
+    const installBtn = document.getElementById('installBtn');
+    const dismissBtn = document.getElementById('installDismiss');
+    const subText = document.getElementById('installBannerSub');
+    const isIOS = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase()) && !window.MSStream;
+
+    let deferredPrompt = null;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      banner.classList.add('show');
+    });
+
+    if(isIOS){
+      subText.textContent = 'Tap the Share icon below, then "Add to Home Screen".';
+      installBtn.style.display = 'none';
+      banner.classList.add('show');
+    }
+
+    installBtn.addEventListener('click', async () => {
+      if(!deferredPrompt) return;
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      banner.classList.remove('show');
+    });
+
+    dismissBtn.addEventListener('click', () => banner.classList.remove('show'));
+
+    if('serviceWorker' in navigator){
+      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+    }
+  })();
+</script>
+
+</body>
+</html>
