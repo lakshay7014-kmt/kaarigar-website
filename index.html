@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#BF3B2C">
-<link rel="icon" href="icons/favicon.png">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Kaarigar">
@@ -624,7 +624,7 @@
       <h3>Complete your profile</h3>
       <p class="modal-sub" id="googleGreeting">Welcome!</p>
 
-      <div class="role-cards" style="margin-bottom:18px;">
+      <div class="role-cards" id="completeProfileRoleCards" style="margin-bottom:18px;">
         <button class="role-card" data-select-role="customer">
           <span class="role-icon">🏠</span>
           <span><strong>I need work done</strong><span>Find and book skilled workers nearby</span></span>
@@ -860,35 +860,69 @@
     async function handleSession(session){
       pendingSession = session;
 
-      const { data: profile, error } = await supabaseClient
+      const { data: profiles, error } = await supabaseClient
         .from('profiles')
-        .select('id, name, role, suspended_until')
-        .eq('user_id', session.user.id)
-        .maybeSingle();
+        .select('id, name, age, role, suspended_until')
+        .eq('user_id', session.user.id);
 
       if(error){ console.error(error); return; }
 
-      if(profile){
-        const isSuspended = profile.role === 'customer' && profile.suspended_until && new Date(profile.suspended_until) > new Date();
-        if(isSuspended){
+      const addRole = new URLSearchParams(window.location.search).get('addRole');
+
+      // ---- Adding a second role to an already-signed-in Google account ----
+      if(addRole === 'worker' || addRole === 'customer'){
+        const existing = profiles.find(p => p.role === addRole);
+        if(existing){
+          // Already has this role — just go there, nothing to set up
           openModal();
-          document.querySelectorAll('.modal-step').forEach(s => s.classList.remove('active'));
-          const untilStr = new Date(profile.suspended_until).toLocaleDateString('en-IN', { day:'numeric', month:'long' });
-          document.getElementById('successTitle').textContent = 'Account suspended';
-          document.getElementById('successSub').textContent =
-            'A worker reported not being paid the agreed amount for a job. Your account is suspended until ' + untilStr + '.';
-          document.getElementById('successIcon').textContent = '⚠️';
-          document.getElementById('successIcon').style.background = 'var(--signal)';
-          showStep('success');
+          goToDashboard(existing.role, existing.name);
           return;
         }
-        // Returning user — straight to their dashboard
+
+        const displayName = (session.user.user_metadata && (session.user.user_metadata.full_name || session.user.user_metadata.name)) || session.user.email;
+        selectedRole = addRole;
+        document.getElementById('googleGreeting').textContent =
+          'Setting up your ' + (addRole === 'worker' ? 'worker' : 'customer') + ' profile, ' + displayName + '.';
+        document.getElementById('completeProfileRoleCards').style.display = 'none';
+
+        // Reuse the age from their other role's profile if we already have it
+        const otherProfile = profiles[0];
+        if(otherProfile && otherProfile.age){
+          document.getElementById('ageInput').value = otherProfile.age;
+        }
+
         openModal();
-        goToDashboard(profile.role, profile.name);
+        showStep('complete-profile');
+        return;
+      }
+
+      // ---- Normal login/signup flow ----
+      if(profiles.length > 0){
+        const customerProfile = profiles.find(p => p.role === 'customer');
+        if(customerProfile){
+          const isSuspended = customerProfile.suspended_until && new Date(customerProfile.suspended_until) > new Date();
+          if(isSuspended){
+            openModal();
+            document.querySelectorAll('.modal-step').forEach(s => s.classList.remove('active'));
+            const untilStr = new Date(customerProfile.suspended_until).toLocaleDateString('en-IN', { day:'numeric', month:'long' });
+            document.getElementById('successTitle').textContent = 'Account suspended';
+            document.getElementById('successSub').textContent =
+              'A worker reported not being paid the agreed amount for a job. Your account is suspended until ' + untilStr + '.';
+            document.getElementById('successIcon').textContent = '⚠️';
+            document.getElementById('successIcon').style.background = 'var(--signal)';
+            showStep('success');
+            return;
+          }
+        }
+        // Returning user — go to whichever role they intended (hero CTA), else customer by default, else whatever they have
+        const target = profiles.find(p => p.role === sessionRoleIntent) || profiles.find(p => p.role === 'customer') || profiles[0];
+        openModal();
+        goToDashboard(target.role, target.name);
       } else {
-        // First Google sign-in — ask role + age
+        // First Google sign-in ever — ask role + age
         const displayName = (session.user.user_metadata && (session.user.user_metadata.full_name || session.user.user_metadata.name)) || session.user.email;
         document.getElementById('googleGreeting').textContent = 'Welcome, ' + displayName + '! Just need a couple more details.';
+        document.getElementById('completeProfileRoleCards').style.display = 'flex';
         if(sessionRoleIntent === 'worker' || sessionRoleIntent === 'customer'){
           selectedRole = sessionRoleIntent;
           const card = document.querySelector('[data-select-role="' + sessionRoleIntent + '"]');

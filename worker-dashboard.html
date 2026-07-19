@@ -546,16 +546,20 @@
       .from('profiles')
       .select('id, name, role')
       .eq('user_id', session.user.id)
+      .eq('role', 'worker')
       .maybeSingle();
 
-    if(error || !profile){
+    if(error){
       document.querySelector('.content').innerHTML =
-        '<div class="empty-state"><div class="e-icon">⚠️</div><p>Could not find your profile.</p><br><a href="index.html" class="ghost-btn" style="text-decoration:none;">Go to login</a></div>';
+        '<div class="empty-state"><div class="e-icon">⚠️</div><p>Something went wrong loading your profile.</p><br><a href="index.html" class="ghost-btn" style="text-decoration:none;">Go to login</a></div>';
       return false;
     }
 
-    if(profile.role !== 'worker'){
-      window.location.href = 'customer-dashboard.html';
+    if(!profile){
+      // This Google account doesn't have a worker profile yet —
+      // send them to set one up (works whether it's brand new or
+      // they already have a customer profile and are adding this too).
+      window.location.href = 'index.html?addRole=worker';
       return false;
     }
 
