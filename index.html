@@ -3,6 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#BF3B2C">
+<link rel="icon" href="icons/favicon.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kaarigar">
 <title>Kaarigar — Every skill on your street, finally findable</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
@@ -291,6 +298,26 @@
 
   /* ---------- FOOTER ---------- */
   footer{padding:48px 24px;text-align:center;}
+
+  /* ---------- INSTALL BANNER ---------- */
+  .install-banner{
+    position:fixed;left:16px;right:16px;bottom:16px;z-index:90;
+    background:var(--ink);color:var(--paper);border-radius:12px;
+    padding:16px 18px;display:none;align-items:center;gap:14px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.3);
+    max-width:520px;margin:0 auto;
+  }
+  .install-banner.show{display:flex;}
+  .install-banner-text{flex:1;font-size:0.88rem;line-height:1.4;}
+  .install-banner-text strong{display:block;font-family:'Baloo 2',sans-serif;font-size:1rem;margin-bottom:2px;}
+  .install-banner-actions{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+  .install-btn{
+    background:var(--signal);color:var(--paper);border:none;
+    padding:9px 16px;border-radius:7px;font-weight:600;font-size:0.88rem;cursor:pointer;
+  }
+  .install-btn:hover{background:var(--mustard);}
+  .install-dismiss{background:none;border:none;color:var(--paper);font-size:1.2rem;cursor:pointer;opacity:0.7;padding:4px;}
+  .install-dismiss:hover{opacity:1;}
   footer .logo{justify-content:center;margin-bottom:16px;}
   footer p{color:var(--ink-soft);font-size:0.88rem;margin:6px 0;}
 
@@ -556,6 +583,18 @@
   <p>Connecting skilled people with nearby work opportunities.</p>
   <p>&copy; 2026 Kaarigar. Building in India, one city at a time.</p>
 </footer>
+
+<!-- ================= INSTALL APP BANNER ================= -->
+<div class="install-banner" id="installBanner">
+  <div class="install-banner-text">
+    <strong>Install Kaarigar</strong>
+    <span id="installBannerSub">Add it to your home screen — opens like an app, no browser bar.</span>
+  </div>
+  <div class="install-banner-actions">
+    <button class="install-btn" id="installBtn">Install</button>
+    <button class="install-dismiss" id="installDismiss" aria-label="Dismiss">&times;</button>
+  </div>
+</div>
 
 <!-- ================= AUTH MODAL ================= -->
 <div class="modal-overlay" id="modalOverlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
@@ -867,6 +906,48 @@
       supabaseClient.auth.onAuthStateChange((event, session) => {
         if(event === 'SIGNED_IN' && session) handleSession(session);
       });
+    }
+  })();
+</script>
+
+<script>
+  // ---------- Install as app (PWA) ----------
+  (function(){
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if(isStandalone) return; // already running as an installed app
+
+    const banner = document.getElementById('installBanner');
+    const installBtn = document.getElementById('installBtn');
+    const dismissBtn = document.getElementById('installDismiss');
+    const subText = document.getElementById('installBannerSub');
+    const isIOS = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase()) && !window.MSStream;
+
+    let deferredPrompt = null;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      banner.classList.add('show');
+    });
+
+    if(isIOS){
+      subText.textContent = 'Tap the Share icon below, then "Add to Home Screen".';
+      installBtn.style.display = 'none';
+      banner.classList.add('show');
+    }
+
+    installBtn.addEventListener('click', async () => {
+      if(!deferredPrompt) return;
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      banner.classList.remove('show');
+    });
+
+    dismissBtn.addEventListener('click', () => banner.classList.remove('show'));
+
+    if('serviceWorker' in navigator){
+      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
     }
   })();
 </script>
