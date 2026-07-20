@@ -365,6 +365,7 @@
     bookings = (data || []).map(b => ({
       id: b.id,
       workerName: b.worker_name || 'Worker',
+      workerPhone: b.worker_phone,
       skill: b.service_name,
       status: b.status,
       price: b.price,
@@ -448,12 +449,16 @@
 
   function bookingCard(b){
     const canCancel = b.status === 'pending' || b.status === 'accepted';
+    const showContact = (b.status === 'accepted' || b.status === 'completed');
+    const contactLine = showContact
+      ? `<br><span style="color:var(--leaf);font-weight:600;">📞 ${b.workerPhone ? b.workerPhone : "Contact shared once worker adds a number"}</span>`
+      : '';
     return `
       <div class="booking-card">
         <div class="booking-avatar" style="background:${b.color};">${b.icon}</div>
         <div class="booking-info">
           <strong>${b.workerName}</strong>
-          <span>${b.skill} · ${b.date} · Pay ₹${b.price} in person</span>
+          <span>${b.skill} · ${b.date} · Pay ₹${b.price} in person${contactLine}</span>
         </div>
         <span class="status-badge status-${b.status}">${statusLabel[b.status]}</span>
         <div class="booking-actions">

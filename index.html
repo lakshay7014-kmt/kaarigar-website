@@ -639,6 +639,11 @@
         <label for="ageInput">Age</label>
         <input type="number" id="ageInput" inputmode="numeric" min="16" max="100" placeholder="e.g. 28">
       </div>
+      <div class="form-field">
+        <label for="phoneInput">Phone number (optional)</label>
+        <input type="tel" id="phoneInput" inputmode="numeric" maxlength="10" placeholder="98765 43210">
+        <p style="font-size:0.78rem;color:var(--ink-soft);margin-top:6px;">Shared with the other side only once a booking is accepted, so you can coordinate directly.</p>
+      </div>
       <div class="modal-error" id="profileError">Please select a role and enter a valid age (16+).</div>
       <button class="modal-submit" id="completeProfileBtn">Finish setup</button>
     </div>
@@ -817,6 +822,7 @@
 
       const user = pendingSession.user;
       const displayName = (user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name)) || user.email;
+      const phoneVal = document.getElementById('phoneInput').value.trim();
 
       try{
         const { data: profile, error: profileErr } = await supabaseClient
@@ -826,6 +832,7 @@
             name: displayName,
             age: Number(ageVal),
             email: user.email,
+            phone: phoneVal || null,
             role: selectedRole
           })
           .select()
