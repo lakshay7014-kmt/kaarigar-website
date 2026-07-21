@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#223A5E">
+<link rel="icon" href="favicon.png">
+<title>Kaarigar — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --wall:#EDE7D9; --paper:#FAF6EC; --ink:#211D18; --ink-soft:#5B5348;
+    --mustard:#E8A63B; --signal:#BF3B2C; --teal:#1B6B68; --leaf:#5C7A4E; --navy:#223A5E;
+    --line: rgba(33,29,24,0.14); --radius: 10px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--wall);color:var(--ink);font-family:'Inter',sans-serif;line-height:1.5;}
+  h1,h2,h3{font-family:'Baloo 2',sans-serif;font-weight:700;margin:0;}
+  .mono{font-family:'IBM Plex Mono',monospace;letter-spacing:0.03em;text-transform:uppercase;font-size:0.7rem;font-weight:600;}
+  button{font-family:inherit;}
+
+  header{background:var(--navy);color:var(--paper);padding:20px 24px;}
+  header h1{font-size:1.3rem;}
+  header p{margin:4px 0 0;color:rgba(250,246,236,0.75);font-size:0.85rem;}
+
+  .content{max-width:900px;margin:0 auto;padding:24px;}
+  .empty-state{text-align:center;padding:60px 20px;color:var(--ink-soft);}
+  .empty-state .e-icon{font-size:2.2rem;margin-bottom:10px;}
+
+  .filters{display:flex;gap:10px;margin-bottom:20px;}
+  .filter-btn{
+    padding:8px 16px;border-radius:999px;border:1px solid var(--line);background:var(--paper);
+    font-weight:600;font-size:0.85rem;cursor:pointer;color:var(--ink-soft);
+  }
+  .filter-btn[aria-selected="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink);}
+
+  .complaint-card{
+    background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px;margin-bottom:16px;
+  }
+  .complaint-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;flex-wrap:wrap;gap:8px;}
+  .status-badge{padding:5px 12px;border-radius:999px;font-size:0.74rem;font-weight:700;text-transform:uppercase;}
+  .status-pending{background:rgba(232,166,59,0.2);color:#8A5D14;}
+  .status-suspended{background:rgba(191,59,44,0.14);color:var(--signal);}
+  .status-dismissed{background:rgba(91,83,72,0.14);color:var(--ink-soft);}
+
+  .party-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;}
+  @media(max-width:600px){.party-grid{grid-template-columns:1fr;}}
+  .party{background:var(--wall);border-radius:8px;padding:14px;}
+  .party .role-label{font-size:0.72rem;font-weight:700;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px;}
+  .party strong{display:block;font-family:'Baloo 2',sans-serif;font-size:1rem;}
+  .party span{display:block;color:var(--ink-soft);font-size:0.85rem;margin-top:2px;}
+  .party.flagged{border:2px solid var(--signal);}
+
+  .job-line{font-size:0.9rem;color:var(--ink-soft);margin-bottom:8px;}
+  .reason-box{background:var(--wall);border-radius:8px;padding:12px 14px;font-size:0.88rem;margin-bottom:14px;}
+  .reason-box .label{font-weight:700;font-size:0.78rem;text-transform:uppercase;color:var(--ink-soft);display:block;margin-bottom:4px;}
+
+  .actions{display:flex;gap:10px;flex-wrap:wrap;}
+  .btn{padding:10px 16px;border-radius:7px;border:none;font-weight:600;font-size:0.85rem;cursor:pointer;}
+  .btn-suspend{background:var(--signal);color:var(--paper);}
+  .btn-suspend:hover{background:var(--ink);}
+  .btn-dismiss{background:none;border:1px solid var(--line);color:var(--ink);}
+  .btn-dismiss:hover{border-color:var(--ink);}
+  .btn-unsuspend{background:var(--leaf);color:var(--paper);}
+  .btn-unsuspend:hover{background:var(--ink);}
+
+  .gate{max-width:420px;margin:80px auto;text-align:center;padding:0 24px;}
+  .gate h2{margin-bottom:10px;}
+  .gate p{color:var(--ink-soft);margin-bottom:20px;}
+  .gate .btn{background:var(--ink);color:var(--paper);padding:14px 24px;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🛡️ Kaarigar Admin</h1>
+  <p>Payment complaint review</p>
+</header>
+
+<div class="content" id="mainContent">
+  <div class="gate">
+    <h2>Checking access…</h2>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // ============================================================
+  // BACKEND CONFIG — must match your other pages
+  // ============================================================
+  const SUPABASE_URL = 'https://wbygseregfnudvuhxklb.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndieWdzZXJlZ2ZudWR2dWh4a2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyNTc3NjIsImV4cCI6MjA5OTgzMzc2Mn0.6VlGmBR1nt0CXPClMDRgbtTiVfPl7cim2rgEvkl23Fs';
+  const BACKEND_READY = SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY';
+  const supabaseClient = BACKEND_READY ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+</script>
+<script>
+(function(){
+  const mainContent = document.getElementById('mainContent');
+  let complaints = [];
+  let activeFilter = 'pending';
+
+  function renderGate(html){
+    mainContent.innerHTML = '<div class="gate">' + html + '</div>';
+  }
+
+  async function signIn(){
+    await supabaseClient.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.href }
+    });
+  }
+
+  function statusLabel(s){
+    return { pending: 'Pending review', suspended: 'Suspended', dismissed: 'Dismissed' }[s] || s;
+  }
+
+  function complaintCard(c){
+    const isCustomerFlagged = c.status !== 'dismissed';
+    const currentlySuspended = c.customer_suspended_until && new Date(c.customer_suspended_until) > new Date();
+    return `
+      <div class="complaint-card">
+        <div class="complaint-top">
+          <span class="mono">${new Date(c.created_at).toLocaleString('en-IN', {day:'numeric', month:'short', year:'numeric', hour:'numeric', minute:'2-digit'})}</span>
+          <span class="status-badge status-${c.status}">${statusLabel(c.status)}</span>
+        </div>
+        <div class="party-grid">
+          <div class="party ${isCustomerFlagged ? 'flagged' : ''}">
+            <span class="role-label">Customer (reported)</span>
+            <strong>${c.customer_name || '—'}</strong>
+            <span>📧 ${c.customer_email || '—'}</span>
+            <span>📞 ${c.customer_phone || 'not provided'}</span>
+            ${currentlySuspended ? '<span style="color:var(--signal);font-weight:700;">Currently suspended until ' + new Date(c.customer_suspended_until).toLocaleDateString('en-IN') + '</span>' : ''}
+          </div>
+          <div class="party">
+            <span class="role-label">Worker (reporting)</span>
+            <strong>${c.worker_name || '—'}</strong>
+            <span>📧 ${c.worker_email || '—'}</span>
+            <span>📞 ${c.worker_phone || 'not provided'}</span>
+          </div>
+        </div>
+        <div class="job-line">💼 ${c.service_name || '—'} · ₹${c.price || '—'}</div>
+        <div class="reason-box"><span class="label">Worker's reason</span>${c.reason || '(none given)'}</div>
+        <div class="actions">
+          ${c.status === 'pending' ? `
+            <button class="btn btn-suspend" data-suspend="${c.id}" data-customer="${c.customer_id}">Suspend customer (7 days)</button>
+            <button class="btn btn-dismiss" data-dismiss="${c.id}">Dismiss — no action</button>
+          ` : ''}
+          ${currentlySuspended ? `<button class="btn btn-unsuspend" data-unsuspend="${c.customer_id}">Unsuspend now</button>` : ''}
+        </div>
+      </div>`;
+  }
+
+  function render(){
+    const filtered = activeFilter === 'all' ? complaints : complaints.filter(c => c.status === activeFilter);
+    const list = filtered.length
+      ? filtered.map(complaintCard).join('')
+      : '<div class="empty-state"><div class="e-icon">✅</div><p>Nothing here.</p></div>';
+
+    mainContent.innerHTML = `
+      <div class="filters">
+        <button class="filter-btn" data-filter="pending" aria-selected="${activeFilter==='pending'}">Pending</button>
+        <button class="filter-btn" data-filter="suspended" aria-selected="${activeFilter==='suspended'}">Suspended</button>
+        <button class="filter-btn" data-filter="dismissed" aria-selected="${activeFilter==='dismissed'}">Dismissed</button>
+        <button class="filter-btn" data-filter="all" aria-selected="${activeFilter==='all'}">All</button>
+      </div>
+      ${list}
+    `;
+
+    mainContent.querySelectorAll('[data-filter]').forEach(btn => {
+      btn.addEventListener('click', () => { activeFilter = btn.dataset.filter; render(); });
+    });
+    mainContent.querySelectorAll('[data-suspend]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if(!confirm('Suspend this customer for 7 days?')) return;
+        const { error } = await supabaseClient.rpc('admin_suspend_customer', {
+          p_customer_id: btn.dataset.customer, p_days: 7, p_complaint_id: btn.dataset.suspend
+        });
+        if(error){ alert('Failed: ' + error.message); return; }
+        await loadComplaints();
+      });
+    });
+    mainContent.querySelectorAll('[data-dismiss]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if(!confirm('Dismiss this complaint with no action?')) return;
+        const { error } = await supabaseClient.rpc('admin_dismiss_complaint', { p_complaint_id: btn.dataset.dismiss });
+        if(error){ alert('Failed: ' + error.message); return; }
+        await loadComplaints();
+      });
+    });
+    mainContent.querySelectorAll('[data-unsuspend]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if(!confirm('Lift this suspension now?')) return;
+        const { error } = await supabaseClient.rpc('admin_unsuspend_customer', { p_customer_id: btn.dataset.unsuspend });
+        if(error){ alert('Failed: ' + error.message); return; }
+        await loadComplaints();
+      });
+    });
+  }
+
+  async function loadComplaints(){
+    const { data, error } = await supabaseClient.rpc('admin_get_complaints');
+    if(error){
+      renderGate('<h2>Could not load complaints</h2><p>' + error.message + '</p>');
+      return;
+    }
+    complaints = data || [];
+    render();
+  }
+
+  async function init(){
+    if(!BACKEND_READY){
+      renderGate('<h2>Backend not connected</h2><p>Add your Supabase URL & key at the top of admin.html.</p>');
+      return;
+    }
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if(!session){
+      renderGate('<h2>Admin sign in</h2><p>Sign in with the Google account that has admin access.</p><button class="btn" id="signInBtn">Continue with Google</button>');
+      document.getElementById('signInBtn').addEventListener('click', signIn);
+      return;
+    }
+
+    const { data: isAdmin, error } = await supabaseClient.rpc('is_admin');
+    if(error || !isAdmin){
+      renderGate('<h2>Not authorized</h2><p>This account (' + session.user.email + ') does not have admin access.</p>');
+      return;
+    }
+
+    await loadComplaints();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

@@ -421,14 +421,20 @@
     list.querySelectorAll('[data-complaint]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.dataset.complaint;
-        const confirmMsg = "This will suspend the customer's account for 7 days. Only use this if they genuinely didn't pay the agreed amount. Continue?";
+        const confirmMsg = "This will notify the Kaarigar team to review this booking. Only use this if the customer genuinely didn't pay the agreed amount. Continue?";
         if(!confirm(confirmMsg)) return;
         const reason = prompt('Briefly describe what happened (optional):', '');
-        const { error } = await supabaseClient.rpc('file_complaint', {
+        const { data, error } = await supabaseClient.rpc('file_complaint', {
           p_booking_id: id, p_reason: reason || null
         });
         if(error){ alert('Could not file complaint: ' + error.message); return; }
-        alert('Complaint filed. The customer\'s account has been suspended.');
+
+        // Best-effort email to the owner — even if this fails, the
+        // complaint itself is already safely recorded in the database.
+        const details = Array.isArray(data) ? data[0] : data;
+        supabaseClient.functions.invoke('notify-complaint', { body: details }).catch(() => {});
+
+        alert('Complaint submitted. Our team will review it and get in touch if action is needed.');
       });
     });
   }

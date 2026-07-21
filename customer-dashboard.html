@@ -343,18 +343,23 @@
       .select('id, name, category, bio, rating, jobs_completed, is_online, services(id, name, price)')
       .order('rating', { ascending: false });
     if(error){ console.error(error); return; }
-    workers = (data || []).map(w => ({
-      id: w.id,
-      name: w.name || 'Worker',
-      cat: w.category,
-      skill: w.category + (w.bio ? ' — ' + w.bio : ''),
-      rating: w.rating,
-      jobs: w.jobs_completed,
-      online: w.is_online,
-      price: (w.services && w.services.length) ? Math.min(...w.services.map(s => s.price)) : 0,
-      serviceName: (w.services && w.services.length) ? w.services[0].name : w.category,
-      ...styleFor(w.category)
-    }));
+
+    const { data: myWorkerId } = await supabaseClient.rpc('get_my_worker_id');
+
+    workers = (data || [])
+      .filter(w => w.id !== myWorkerId) // don't show yourself in your own customer search
+      .map(w => ({
+        id: w.id,
+        name: w.name || 'Worker',
+        cat: w.category,
+        skill: w.category + (w.bio ? ' — ' + w.bio : ''),
+        rating: w.rating,
+        jobs: w.jobs_completed,
+        online: w.is_online,
+        price: (w.services && w.services.length) ? Math.min(...w.services.map(s => s.price)) : 0,
+        serviceName: (w.services && w.services.length) ? w.services[0].name : w.category,
+        ...styleFor(w.category)
+      }));
   }
 
   async function loadBookings(){
@@ -483,13 +488,20 @@
 
     list.querySelectorAll('[data-cancel]').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const { error } = await supabaseClient.rpc('update_booking_status', {
-          p_booking_id: btn.dataset.cancel, p_new_status: 'cancelled'
-        });
-        if(!error){
+        try{
+          const { error } = await supabaseClient.rpc('update_booking_status', {
+            p_booking_id: btn.dataset.cancel, p_new_status: 'cancelled'
+          });
+          if(error){
+            alert('Could not cancel booking: ' + error.message);
+            return;
+          }
           const b = bookings.find(x => x.id === btn.dataset.cancel);
           if(b) b.status = 'cancelled';
           renderBookings();
+        } catch(err){
+          console.error('Cancel failed:', err);
+          alert('Something went wrong cancelling this booking.');
         }
       });
     });
@@ -559,44 +571,54 @@
     const confirmBtn = document.getElementById('confirmBookBtn');
     const note = document.getElementById('bookNote').value.trim();
 
-    confirmBtn.disabled = true;
-    confirmBtn.textContent = 'Please wait…';
-
-    const { data: booking, error } = await supabaseClient
-      .from('bookings')
-      .insert({
-        customer_id: uid,
-        worker_id: pendingBookWorker.id,
-        service_name: pendingBookWorker.serviceName,
-        price: pendingBookWorker.price,
-        status: 'pending',
-        scheduled_note: note
-      })
-      .select()
-      .single();
-
-    confirmBtn.disabled = false;
-    confirmBtn.textContent = 'Confirm booking · ₹' + pendingBookWorker.price;
-
-    if(error){
-      alert('Could not create booking: ' + error.message);
+    if(!pendingBookWorker){
+      alert('Something went wrong — please close this and tap "Book Now" again.');
       return;
     }
 
-    bookings.unshift({
-      id: booking.id,
-      workerName: pendingBookWorker.name,
-      skill: pendingBookWorker.serviceName,
-      icon: pendingBookWorker.icon,
-      color: pendingBookWorker.color,
-      date: 'Just now',
-      status: 'pending',
-      price: pendingBookWorker.price
-    });
-    renderBookings();
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Please wait…';
 
-    document.querySelectorAll('.modal-step').forEach(s => s.classList.remove('active'));
-    document.querySelector('[data-mstep="success"]').classList.add('active');
+    try{
+      const { data: booking, error } = await supabaseClient
+        .from('bookings')
+        .insert({
+          customer_id: uid,
+          worker_id: pendingBookWorker.id,
+          service_name: pendingBookWorker.serviceName,
+          price: pendingBookWorker.price,
+          status: 'pending',
+          scheduled_note: note
+        })
+        .select()
+        .single();
+
+      if(error){
+        alert('Could not create booking: ' + error.message);
+        return;
+      }
+
+      bookings.unshift({
+        id: booking.id,
+        workerName: pendingBookWorker.name,
+        skill: pendingBookWorker.serviceName,
+        icon: pendingBookWorker.icon,
+        color: pendingBookWorker.color,
+        date: 'Just now',
+        status: 'pending',
+        price: pendingBookWorker.price
+      });
+      renderBookings();
+
+      document.querySelectorAll('.modal-step').forEach(s => s.classList.remove('active'));
+      document.querySelector('[data-mstep="success"]').classList.add('active');
+    } catch(err){
+      console.error('Booking failed:', err);
+      alert('Something went wrong creating the booking: ' + (err.message || err));
+    } finally {
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Confirm booking · ₹' + (pendingBookWorker ? pendingBookWorker.price : '');
+    }
   });
   document.getElementById('bookDoneBtn').addEventListener('click', () => bookModal.classList.remove('open'));
 
