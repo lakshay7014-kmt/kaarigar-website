@@ -124,6 +124,32 @@
   .booking-row .bk-info{flex:1;min-width:220px;font-size:0.88rem;}
   .booking-row .bk-info strong{font-family:'Baloo 2',sans-serif;}
   .booking-row .bk-price{font-family:'IBM Plex Mono',monospace;font-weight:600;}
+
+  /* verification status pills */
+  .pill-status-incomplete{background:rgba(91,83,72,0.12);color:var(--ink-soft);}
+  .pill-status-pending{background:rgba(232,166,59,0.2);color:#8A5D14;}
+  .pill-status-verified{background:rgba(92,122,78,0.18);color:var(--leaf);}
+  .pill-status-rejected{background:rgba(191,59,44,0.14);color:var(--signal);}
+
+  /* inline edit form on customer/worker cards */
+  .edit-form{background:var(--wall);border-radius:8px;padding:14px;margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .edit-form.wide-field{grid-column:1/-1;}
+  @media(max-width:600px){.edit-form{grid-template-columns:1fr;}}
+  .edit-form label{font-size:0.78rem;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px;}
+  .edit-form input,.edit-form textarea{width:100%;padding:9px 11px;border-radius:7px;border:1px solid var(--line);font-size:0.88rem;font-family:inherit;background:var(--paper);}
+  .edit-form textarea{grid-column:1/-1;min-height:60px;resize:vertical;}
+  .edit-form .edit-actions{grid-column:1/-1;display:flex;gap:8px;}
+
+  /* verification queue card */
+  .verify-card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:14px;}
+  .verify-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:0.88rem;color:var(--ink-soft);margin:12px 0;}
+  @media(max-width:600px){.verify-grid{grid-template-columns:1fr;}}
+  .verify-grid b{color:var(--ink);}
+  .doc-link{display:inline-block;margin-top:4px;color:var(--navy);font-weight:700;text-decoration:underline;cursor:pointer;font-size:0.85rem;}
+  .btn-approve{background:var(--leaf);color:var(--paper);}
+  .btn-approve:hover{background:var(--ink);}
+  .btn-reject{background:var(--signal);color:var(--paper);}
+  .btn-reject:hover{background:var(--ink);}
 </style>
 </head>
 <body>
@@ -142,6 +168,7 @@
 <div class="content" id="adminApp" style="display:none;">
   <div class="admin-tabs">
     <button class="admin-tab-btn" data-tab="overview" aria-selected="true">Overview</button>
+    <button class="admin-tab-btn" data-tab="verification" aria-selected="false">Verification <span id="verifyCount" class="nav-count" style="display:none;background:var(--signal);color:var(--paper);font-size:0.68rem;font-weight:700;padding:1px 7px;border-radius:999px;margin-left:4px;"></span></button>
     <button class="admin-tab-btn" data-tab="customers" aria-selected="false">Customers</button>
     <button class="admin-tab-btn" data-tab="workers" aria-selected="false">Workers</button>
     <button class="admin-tab-btn" data-tab="bookings" aria-selected="false">Bookings</button>
@@ -149,6 +176,7 @@
   </div>
 
   <div class="admin-panel active" id="panel-overview"></div>
+  <div class="admin-panel" id="panel-verification"></div>
   <div class="admin-panel" id="panel-customers"></div>
   <div class="admin-panel" id="panel-workers"></div>
   <div class="admin-panel" id="panel-bookings"></div>
@@ -214,6 +242,7 @@
 
   async function loadTab(tab){
     if(tab === 'overview') await loadStats();
+    if(tab === 'verification') await loadVerificationQueue();
     if(tab === 'customers') await loadCustomers();
     if(tab === 'workers') await loadWorkers();
     if(tab === 'bookings') await loadBookings();
@@ -237,6 +266,7 @@
 
   function renderStats(){
     const s = stats || {};
+    updateVerifyBadge(s.pending_verifications || 0);
     document.getElementById('panel-overview').innerHTML = `
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-label">Total customers</div><div class="stat-value">${s.total_customers ?? 0}</div></div>
@@ -247,9 +277,98 @@
         <div class="stat-card"><div class="stat-label">Pending bookings</div><div class="stat-value">${s.pending_bookings ?? 0}</div></div>
         <div class="stat-card"><div class="stat-label">Completed bookings</div><div class="stat-value">${s.completed_bookings ?? 0}</div></div>
         <div class="stat-card"><div class="stat-label">Pending complaints</div><div class="stat-value">${s.pending_complaints ?? 0}</div></div>
+        <div class="stat-card"><div class="stat-label">Awaiting verification</div><div class="stat-value">${s.pending_verifications ?? 0}</div></div>
         <div class="stat-card"><div class="stat-label">Total collected</div><div class="stat-value">${fmtMoney(s.total_collected)}</div></div>
       </div>
     `;
+  }
+
+  function updateVerifyBadge(count){
+    const el = document.getElementById('verifyCount');
+    el.textContent = count;
+    el.style.display = count > 0 ? 'inline-block' : 'none';
+  }
+
+  // ============================================================
+  // VERIFICATION QUEUE
+  // ============================================================
+  let verificationQueue = [];
+
+  async function loadVerificationQueue(){
+    const panel = document.getElementById('panel-verification');
+    panel.innerHTML = '<p style="color:var(--ink-soft);">Loading…</p>';
+    const { data, error } = await supabaseClient.rpc('admin_get_verification_queue');
+    if(error){
+      panel.innerHTML = '<p style="color:var(--signal);">Could not load verification queue: ' + error.message + '</p>';
+      return;
+    }
+    verificationQueue = data || [];
+    updateVerifyBadge(verificationQueue.length);
+    renderVerificationQueue();
+  }
+
+  function verifyCard(v){
+    return `
+      <div class="verify-card">
+        <div class="data-top">
+          <div>
+            <div class="data-name">${v.name || '—'}</div>
+            <div class="data-sub">${v.role === 'worker' ? '🧰 Worker' : '🙋 Customer'} · Submitted ${fmtDate(v.verification_submitted_at)}</div>
+          </div>
+          <span class="pill pill-status-pending">Pending review</span>
+        </div>
+        <div class="verify-grid">
+          <span>📧 <b>${v.email || '—'}</b></span>
+          <span>📞 <b>${v.phone || '—'}</b></span>
+          <span>🎂 DOB <b>${fmtDate(v.dob)}</b></span>
+          <span>🏠 <b>${v.address || '—'}</b></span>
+        </div>
+        ${v.id_document_path
+          ? `<a class="doc-link" data-view-doc="${v.id_document_path}">📄 View uploaded ID document</a>`
+          : '<span style="color:var(--signal);font-size:0.85rem;">No ID document on file</span>'}
+        <div class="actions" style="margin-top:14px;">
+          <button class="btn btn-approve" data-approve="${v.profile_id}">Approve</button>
+          <button class="btn btn-reject" data-reject="${v.profile_id}">Reject</button>
+        </div>
+      </div>`;
+  }
+
+  function renderVerificationQueue(){
+    const panel = document.getElementById('panel-verification');
+    panel.innerHTML = verificationQueue.length
+      ? verificationQueue.map(verifyCard).join('')
+      : '<div class="empty-state"><div class="e-icon">✅</div><p>No profiles waiting for verification.</p></div>';
+
+    panel.querySelectorAll('[data-view-doc]').forEach(link => {
+      link.addEventListener('click', async () => {
+        const { data, error } = await supabaseClient
+          .storage.from('verification-docs')
+          .createSignedUrl(link.dataset.viewDoc, 300);
+        if(error){ alert('Could not open document: ' + error.message); return; }
+        window.open(data.signedUrl, '_blank');
+      });
+    });
+    panel.querySelectorAll('[data-approve]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if(!confirm('Approve this profile? They will get full access to the app.')) return;
+        const { error } = await supabaseClient.rpc('admin_review_verification', {
+          p_profile_id: btn.dataset.approve, p_approve: true, p_note: null
+        });
+        if(error){ alert('Failed: ' + error.message); return; }
+        await loadVerificationQueue();
+      });
+    });
+    panel.querySelectorAll('[data-reject]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const note = prompt('Reason for rejection (shown to the user):', 'Document unclear, please re-upload.');
+        if(note === null) return;
+        const { error } = await supabaseClient.rpc('admin_review_verification', {
+          p_profile_id: btn.dataset.reject, p_approve: false, p_note: note
+        });
+        if(error){ alert('Failed: ' + error.message); return; }
+        await loadVerificationQueue();
+      });
+    });
   }
 
   // ============================================================
@@ -267,6 +386,12 @@
     renderCustomers();
   }
 
+  function verificationPill(status){
+    const labels = { incomplete: 'Profile incomplete', pending: 'Pending review', verified: 'Verified', rejected: 'Rejected' };
+    const s = status || 'incomplete';
+    return `<span class="pill pill-status-${s}">${labels[s] || s}</span>`;
+  }
+
   function customerCard(c){
     const suspended = isSuspended(c.suspended_until);
     return `
@@ -275,8 +400,12 @@
           <div>
             <div class="data-name">${c.name || '—'}</div>
             <div class="data-sub">📧 ${c.email || '—'} &nbsp; 📞 ${c.phone || 'not provided'}${c.age ? ' &nbsp; · ' + c.age + ' yrs' : ''}</div>
+            <div class="data-sub">🏠 ${c.address || 'no address on file'}</div>
           </div>
-          ${suspended ? '<span class="pill pill-suspended">Suspended till ' + fmtDate(c.suspended_until) + '</span>' : ''}
+          <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+            ${verificationPill(c.verification_status)}
+            ${suspended ? '<span class="pill pill-suspended">Suspended till ' + fmtDate(c.suspended_until) + '</span>' : ''}
+          </div>
         </div>
         <div class="data-meta">
           <span>Joined <b>${fmtDate(c.created_at)}</b></span>
@@ -288,6 +417,28 @@
           ${suspended
             ? `<button class="btn-sm btn-navy" data-unsuspend-user="${c.id}">Unsuspend</button>`
             : `<button class="btn-sm btn-ghost" data-suspend-user="${c.id}">Suspend…</button>`}
+          <button class="btn-sm btn-ghost" data-edit-customer="${c.id}">Edit profile</button>
+        </div>
+        <div class="edit-form-slot" id="edit-customer-${c.id}"></div>
+      </div>`;
+  }
+
+  function editProfileForm(kind, p){
+    const dobVal = p.dob ? new Date(p.dob).toISOString().slice(0,10) : '';
+    return `
+      <div class="edit-form">
+        <div><label>Full name</label><input type="text" id="ef-name-${kind}-${p.id}" value="${(p.name||'').replace(/"/g,'&quot;')}"></div>
+        <div><label>Phone</label><input type="text" id="ef-phone-${kind}-${p.id}" value="${(p.phone||'').replace(/"/g,'&quot;')}"></div>
+        <div><label>Date of birth</label><input type="date" id="ef-dob-${kind}-${p.id}" value="${dobVal}"></div>
+        <div><label>Verification status</label><input type="text" value="${p.verification_status || 'incomplete'}" disabled style="opacity:0.6;"></div>
+        <div class="wide-field"><label>Permanent address</label><textarea id="ef-address-${kind}-${p.id}">${(p.address||'')}</textarea></div>
+        ${kind === 'worker' ? `
+          <div><label>Category</label><input type="text" id="ef-category-${p.worker_id}" value="${(p.category||'').replace(/"/g,'&quot;')}"></div>
+          <div class="wide-field"><label>Bio</label><textarea id="ef-bio-${p.worker_id}">${(p.bio||'')}</textarea></div>
+        ` : ''}
+        <div class="edit-actions">
+          <button class="btn-sm btn-navy" data-save-edit="${kind}" data-id="${p.id}" ${kind==='worker' ? 'data-worker-id="'+p.worker_id+'"' : ''}>Save changes</button>
+          <button class="btn-sm btn-ghost" data-cancel-edit="${kind}" data-id="${p.id}">Cancel</button>
         </div>
       </div>`;
   }
@@ -320,6 +471,53 @@
     });
 
     attachSuspendHandlers(panel);
+
+    panel.querySelectorAll('[data-edit-customer]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const c = customers.find(x => x.id === btn.dataset.editCustomer);
+        const slot = document.getElementById('edit-customer-' + c.id);
+        slot.innerHTML = slot.innerHTML ? '' : editProfileForm('customer', c);
+        attachEditFormHandlers(slot);
+      });
+    });
+  }
+
+  function attachEditFormHandlers(scope){
+    scope.querySelectorAll('[data-cancel-edit]').forEach(btn => {
+      btn.addEventListener('click', () => { btn.closest('.edit-form').remove(); });
+    });
+    scope.querySelectorAll('[data-save-edit]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const kind = btn.dataset.saveEdit;
+        const id = btn.dataset.id;
+        const name = document.getElementById(`ef-name-${kind}-${id}`).value.trim();
+        const phone = document.getElementById(`ef-phone-${kind}-${id}`).value.trim();
+        const address = document.getElementById(`ef-address-${kind}-${id}`).value.trim();
+        const dobStr = document.getElementById(`ef-dob-${kind}-${id}`).value;
+
+        const { error } = await supabaseClient.rpc('admin_update_profile', {
+          p_profile_id: id,
+          p_name: name || null,
+          p_phone: phone || null,
+          p_address: address || null,
+          p_dob: dobStr || null
+        });
+        if(error){ alert('Failed to save: ' + error.message); return; }
+
+        if(kind === 'worker'){
+          const workerId = btn.dataset.workerId;
+          const category = document.getElementById(`ef-category-${workerId}`).value.trim();
+          const bio = document.getElementById(`ef-bio-${workerId}`).value.trim();
+          const { error: wErr } = await supabaseClient.rpc('admin_update_worker_details', {
+            p_worker_id: workerId, p_name: name || null, p_category: category || null, p_bio: bio || null
+          });
+          if(wErr){ alert('Saved profile, but worker details failed: ' + wErr.message); }
+        }
+
+        if(kind === 'customer') await loadCustomers();
+        else await loadWorkers();
+      });
+    });
   }
 
   // ============================================================
@@ -346,10 +544,12 @@
             <div class="data-name">${w.name || '—'}</div>
             <div class="data-sub">🧰 ${w.category || '—'}${w.bio ? ' — ' + w.bio : ''}</div>
             <div class="data-sub">📧 ${w.email || '—'} &nbsp; 📞 ${w.phone || 'not provided'}</div>
+            <div class="data-sub">🏠 ${w.address || 'no address on file'}</div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
             <span class="pill ${w.is_online ? 'pill-online' : 'pill-offline'}">${w.is_online ? 'Online' : 'Offline'}</span>
             <span class="pill ${w.is_verified ? 'pill-verified' : 'pill-unverified'}">${w.is_verified ? 'Verified' : 'Unverified'}</span>
+            ${verificationPill(w.verification_status)}
             ${suspended ? '<span class="pill pill-suspended">Suspended till ' + fmtDate(w.suspended_until) + '</span>' : ''}
           </div>
         </div>
@@ -366,7 +566,9 @@
           <button class="btn-sm ${w.is_verified ? 'btn-ghost' : 'btn-navy'}" data-toggle-verify="${w.worker_id}" data-verified="${w.is_verified}">
             ${w.is_verified ? 'Remove verification' : 'Mark verified'}
           </button>
+          <button class="btn-sm btn-ghost" data-edit-worker="${w.profile_id}">Edit profile</button>
         </div>
+        <div class="edit-form-slot" id="edit-worker-${w.profile_id}"></div>
       </div>`;
   }
 
@@ -406,6 +608,20 @@
         });
         if(error){ alert('Failed: ' + error.message); return; }
         await loadWorkers();
+      });
+    });
+
+    panel.querySelectorAll('[data-edit-worker]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const w = workersList.find(x => x.profile_id === btn.dataset.editWorker);
+        const slot = document.getElementById('edit-worker-' + w.profile_id);
+        const p = {
+          id: w.profile_id, worker_id: w.worker_id, name: w.name, phone: w.phone,
+          address: w.address, dob: w.dob, verification_status: w.verification_status,
+          category: w.category, bio: w.bio
+        };
+        slot.innerHTML = slot.innerHTML ? '' : editProfileForm('worker', p);
+        attachEditFormHandlers(slot);
       });
     });
   }

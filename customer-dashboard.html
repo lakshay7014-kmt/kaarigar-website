@@ -164,6 +164,7 @@
   .form-field input:focus,.form-field textarea:focus{border-color:var(--signal);background:var(--paper);}
   .modal-submit{width:100%;padding:13px;border-radius:8px;border:none;background:var(--signal);color:var(--paper);font-weight:600;font-size:0.98rem;cursor:pointer;margin-top:4px;}
   .modal-submit:hover{background:var(--ink);}
+  .modal-submit:disabled{opacity:0.6;cursor:not-allowed;}
   .modal-step{display:none;}
   .modal-step.active{display:block;}
   .modal-step-success{text-align:center;}
@@ -175,6 +176,23 @@
     .menu-toggle{display:inline-flex !important;}
   }
   .menu-toggle{display:none;background:none;border:none;font-size:1.3rem;cursor:pointer;}
+
+  /* ---------- Profile verification gate ---------- */
+  .verify-wrap{max-width:520px;margin:40px auto;padding:0 20px;}
+  .verify-banner{border-radius:var(--radius);padding:18px 20px;margin-bottom:24px;}
+  .verify-banner.pending{background:rgba(232,166,59,0.14);border:1px solid rgba(232,166,59,0.4);}
+  .verify-banner.rejected{background:rgba(191,59,44,0.1);border:1px solid rgba(191,59,44,0.35);}
+  .verify-banner h3{margin-bottom:6px;}
+  .verify-banner p{color:var(--ink-soft);font-size:0.9rem;margin:0;}
+  .verify-form .form-field{margin-bottom:16px;}
+  .verify-form label{display:block;font-weight:600;font-size:0.85rem;margin-bottom:6px;}
+  .verify-form input[type="file"]{
+    width:100%;padding:10px 12px;border-radius:8px;border:2px dashed var(--line);
+    background:var(--wall);font-size:0.88rem;
+  }
+  .verify-form small{display:block;color:var(--ink-soft);font-size:0.78rem;margin-top:5px;}
+  .verify-error{color:var(--signal);font-size:0.85rem;margin-bottom:14px;display:none;}
+  .verify-error.show{display:block;}
 </style>
 </head>
 <body>
@@ -639,7 +657,7 @@
 
     const { data: profile, error } = await supabaseClient
       .from('profiles')
-      .select('id, name, role, suspended_until')
+      .select('id, name, phone, address, dob, role, suspended_until, verification_status, verification_note')
       .eq('user_id', session.user.id)
       .eq('role', 'customer')
       .maybeSingle();
@@ -666,10 +684,125 @@
       return false;
     }
 
+    if(profile.verification_status !== 'verified'){
+      renderVerifyGate(profile, session.user.id, 'customer');
+      return false;
+    }
+
     uid = profile.id;
     document.getElementById('greetingName').textContent = 'Namaste, ' + profile.name + ' 👋';
     document.querySelector('.avatar').textContent = (profile.name || 'C').charAt(0).toUpperCase();
     return true;
+  }
+
+  // ---------- Profile completion / verification gate ----------
+  function verifyGateHtml(profile, statusOverride){
+    const status = statusOverride || profile.verification_status || 'incomplete';
+
+    if(status === 'pending'){
+      return `
+        <div class="verify-wrap">
+          <div class="verify-banner pending">
+            <h3>⏳ Your profile is under review</h3>
+            <p>Thanks for submitting your details. Our team verifies new profiles within 24 hours — you'll get full access to Kaarigar as soon as it's approved. No need to resubmit.</p>
+          </div>
+        </div>`;
+    }
+
+    const rejectedBanner = status === 'rejected'
+      ? `<div class="verify-banner rejected">
+           <h3>❗ Your submission needs a fix</h3>
+           <p>${profile.verification_note ? profile.verification_note : 'Please review your details and resubmit.'}</p>
+         </div>`
+      : '';
+
+    const dobVal = profile.dob ? new Date(profile.dob).toISOString().slice(0,10) : '';
+
+    return `
+      <div class="verify-wrap">
+        ${status === 'incomplete' ? `
+          <div class="verify-banner pending" style="background:rgba(34,58,94,0.08);border-color:rgba(34,58,94,0.3);">
+            <h3>👋 Complete your profile</h3>
+            <p>Fill in your details and upload a government ID. Our team verifies new profiles within 24 hours — after that you'll get full access to Kaarigar.</p>
+          </div>` : rejectedBanner}
+        <form class="verify-form" id="verifyForm">
+          <div id="verifyError" class="verify-error"></div>
+          <div class="form-field">
+            <label>Full name</label>
+            <input type="text" id="vf-name" value="${(profile.name||'').replace(/"/g,'&quot;')}" required>
+          </div>
+          <div class="form-field">
+            <label>Mobile number</label>
+            <input type="tel" id="vf-phone" value="${(profile.phone||'').replace(/"/g,'&quot;')}" placeholder="10-digit mobile number" required>
+          </div>
+          <div class="form-field">
+            <label>Date of birth</label>
+            <input type="date" id="vf-dob" value="${dobVal}" required>
+          </div>
+          <div class="form-field">
+            <label>Permanent address</label>
+            <textarea id="vf-address" rows="3" required>${profile.address || ''}</textarea>
+          </div>
+          <div class="form-field">
+            <label>Government ID (Aadhaar / PAN / Voter ID / DL)</label>
+            <input type="file" id="vf-id-doc" accept="image/*,.pdf" required>
+            <small>Photo or scan, clearly readable. JPG, PNG or PDF.</small>
+          </div>
+          <button type="submit" class="modal-submit" id="verifySubmitBtn">Submit for verification</button>
+        </form>
+      </div>`;
+  }
+
+  function renderVerifyGate(profile, authUserId, roleLabel){
+    document.querySelector('.content').innerHTML = verifyGateHtml(profile);
+    if(profile.verification_status === 'pending') return;
+
+    document.getElementById('verifyForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorEl = document.getElementById('verifyError');
+      errorEl.classList.remove('show');
+
+      const name = document.getElementById('vf-name').value.trim();
+      const phone = document.getElementById('vf-phone').value.trim();
+      const dob = document.getElementById('vf-dob').value;
+      const address = document.getElementById('vf-address').value.trim();
+      const fileInput = document.getElementById('vf-id-doc');
+      const file = fileInput.files[0];
+
+      if(!name || !phone || !dob || !address || !file){
+        errorEl.textContent = 'Please fill in every field and attach your ID document.';
+        errorEl.classList.add('show');
+        return;
+      }
+
+      const btn = document.getElementById('verifySubmitBtn');
+      btn.disabled = true;
+      btn.textContent = 'Uploading…';
+
+      try{
+        const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+        const path = `${authUserId}/${profile.id}-${Date.now()}-${safeName}`;
+
+        const { error: uploadErr } = await supabaseClient
+          .storage.from('verification-docs')
+          .upload(path, file, { upsert: false });
+        if(uploadErr) throw uploadErr;
+
+        const { error: submitErr } = await supabaseClient.rpc('submit_verification', {
+          p_profile_id: profile.id, p_name: name, p_phone: phone,
+          p_address: address, p_dob: dob, p_id_document_path: path
+        });
+        if(submitErr) throw submitErr;
+
+        profile.verification_status = 'pending';
+        document.querySelector('.content').innerHTML = verifyGateHtml(profile);
+      } catch(err){
+        errorEl.textContent = err.message || 'Something went wrong. Please try again.';
+        errorEl.classList.add('show');
+        btn.disabled = false;
+        btn.textContent = 'Submit for verification';
+      }
+    });
   }
 
   // ---------- Init ----------
