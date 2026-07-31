@@ -624,7 +624,7 @@
       <div id="adminLoginBox" style="display:none;text-align:left;margin-top:14px;">
         <div class="form-field">
           <label for="adminUsername">Admin username</label>
-          <input type="text" id="adminUsername" autocomplete="username">
+          <input type="text" id="adminUsername" autocomplete="username" placeholder="e.g. 7014954046">
         </div>
         <div class="form-field">
           <label for="adminPassword">Password</label>
@@ -820,14 +820,20 @@
     });
 
     document.getElementById('adminLoginBtn').addEventListener('click', async () => {
-      if(!BACKEND_READY){
-        document.getElementById('adminLoginError').textContent = 'Backend not connected yet.';
-        return;
-      }
-      const username = document.getElementById('adminUsername').value.trim();
-      const password = document.getElementById('adminPassword').value;
       const errorEl = document.getElementById('adminLoginError');
       errorEl.textContent = '';
+      errorEl.classList.remove('show');
+
+      if(!BACKEND_READY){
+        errorEl.textContent = 'Backend not connected yet.';
+        errorEl.classList.add('show');
+        return;
+      }
+      const rawUsername = document.getElementById('adminUsername').value.trim();
+      const password = document.getElementById('adminPassword').value;
+      // Tolerate someone typing the full "xxx@kaarigar.local" by mistake —
+      // only append the suffix if it isn't already there.
+      const email = rawUsername.includes('@') ? rawUsername : rawUsername + '@kaarigar.local';
 
       const btn = document.getElementById('adminLoginBtn');
       btn.disabled = true;
@@ -835,16 +841,14 @@
 
       adminLoginInProgress = true;
 
-      const { error } = await supabaseClient.auth.signInWithPassword({
-        email: username + '@kaarigar.local',
-        password: password
-      });
+      const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
 
       btn.disabled = false;
       btn.textContent = 'Log in as admin';
 
       if(error){
         errorEl.textContent = 'Incorrect username or password.';
+        errorEl.classList.add('show');
         adminLoginInProgress = false;
         return;
       }
@@ -853,6 +857,7 @@
       const { data: isAdmin } = await supabaseClient.rpc('is_admin');
       if(!isAdmin){
         errorEl.textContent = 'This account does not have admin access.';
+        errorEl.classList.add('show');
         await supabaseClient.auth.signOut();
         adminLoginInProgress = false;
         return;
