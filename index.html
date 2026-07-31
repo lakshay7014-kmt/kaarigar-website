@@ -616,6 +616,23 @@
         <span>Continue with Google</span>
       </button>
       <div class="modal-error" id="googleError"></div>
+
+      <button type="button" id="adminLoginToggle" style="background:none;border:none;color:var(--ink-soft);font-size:0.82rem;text-decoration:underline;text-underline-offset:3px;cursor:pointer;margin-top:18px;">
+        Admin login
+      </button>
+
+      <div id="adminLoginBox" style="display:none;text-align:left;margin-top:14px;">
+        <div class="form-field">
+          <label for="adminUsername">Admin username</label>
+          <input type="text" id="adminUsername" autocomplete="username">
+        </div>
+        <div class="form-field">
+          <label for="adminPassword">Password</label>
+          <input type="password" id="adminPassword" autocomplete="current-password">
+        </div>
+        <div class="modal-error" id="adminLoginError"></div>
+        <button class="modal-submit" id="adminLoginBtn" type="button" style="background:var(--navy);">Log in as admin</button>
+      </div>
     </div>
 
     <!-- STEP: complete profile (first-time Google users only) -->
@@ -730,6 +747,7 @@
     let lastFocused = null;
     let selectedRole = null;
     let pendingSession = null;
+    let adminLoginInProgress = false;
 
     function showStep(name){
       steps.forEach(s => s.classList.toggle('active', s.dataset.step === name));
@@ -793,6 +811,54 @@
         btn.disabled = false;
       }
       // On success, the browser navigates away to Google — nothing more to do here.
+    });
+
+    // ---------- Admin login (username/password, separate from Google) ----------
+    document.getElementById('adminLoginToggle').addEventListener('click', () => {
+      const box = document.getElementById('adminLoginBox');
+      box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    });
+
+    document.getElementById('adminLoginBtn').addEventListener('click', async () => {
+      if(!BACKEND_READY){
+        document.getElementById('adminLoginError').textContent = 'Backend not connected yet.';
+        return;
+      }
+      const username = document.getElementById('adminUsername').value.trim();
+      const password = document.getElementById('adminPassword').value;
+      const errorEl = document.getElementById('adminLoginError');
+      errorEl.textContent = '';
+
+      const btn = document.getElementById('adminLoginBtn');
+      btn.disabled = true;
+      btn.textContent = 'Please wait…';
+
+      adminLoginInProgress = true;
+
+      const { error } = await supabaseClient.auth.signInWithPassword({
+        email: username + '@kaarigar.local',
+        password: password
+      });
+
+      btn.disabled = false;
+      btn.textContent = 'Log in as admin';
+
+      if(error){
+        errorEl.textContent = 'Incorrect username or password.';
+        adminLoginInProgress = false;
+        return;
+      }
+
+      // Confirm this account actually has admin access before sending them there
+      const { data: isAdmin } = await supabaseClient.rpc('is_admin');
+      if(!isAdmin){
+        errorEl.textContent = 'This account does not have admin access.';
+        await supabaseClient.auth.signOut();
+        adminLoginInProgress = false;
+        return;
+      }
+
+      window.location.href = 'admin.html';
     });
 
     // ---------- Role selection in the "complete profile" step ----------
@@ -865,6 +931,7 @@
 
     // ---------- Handle the return trip from Google (or an existing session) ----------
     async function handleSession(session){
+      if(adminLoginInProgress) return; // admin flow is handling its own redirect
       pendingSession = session;
 
       const { data: profiles, error } = await supabaseClient
