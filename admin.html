@@ -71,19 +71,88 @@
   .gate h2{margin-bottom:10px;}
   .gate p{color:var(--ink-soft);margin-bottom:20px;}
   .gate .btn{background:var(--ink);color:var(--paper);padding:14px 24px;}
+
+  /* ---------- Admin tabs & new panels ---------- */
+  .admin-tabs{display:flex;gap:8px;margin-bottom:22px;overflow-x:auto;padding-bottom:2px;}
+  .admin-tab-btn{
+    padding:9px 18px;border-radius:999px;border:1px solid var(--line);background:var(--paper);
+    font-weight:700;font-size:0.85rem;cursor:pointer;color:var(--ink-soft);white-space:nowrap;flex-shrink:0;
+  }
+  .admin-tab-btn[aria-selected="true"]{background:var(--navy);color:var(--paper);border-color:var(--navy);}
+  .admin-panel{display:none;}
+  .admin-panel.active{display:block;}
+
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:26px;}
+  .stat-card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:18px;}
+  .stat-card .stat-label{color:var(--ink-soft);font-size:0.78rem;font-weight:600;margin-bottom:6px;}
+  .stat-card .stat-value{font-family:'Baloo 2',sans-serif;font-size:1.5rem;font-weight:700;}
+
+  .toolbar{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;align-items:center;}
+  .search-input{
+    flex:1;min-width:200px;padding:10px 14px;border-radius:8px;border:1px solid var(--line);
+    background:var(--paper);font-size:0.9rem;
+  }
+  .search-input:focus{outline:2px solid var(--navy);}
+
+  .data-card{
+    background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px 18px;margin-bottom:12px;
+  }
+  .data-card.suspended{border-color:var(--signal);}
+  .data-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+  .data-name{font-family:'Baloo 2',sans-serif;font-size:1.05rem;font-weight:700;}
+  .data-sub{color:var(--ink-soft);font-size:0.82rem;margin-top:2px;}
+  .data-meta{display:flex;flex-wrap:wrap;gap:14px;font-size:0.85rem;color:var(--ink-soft);margin-bottom:12px;}
+  .data-meta b{color:var(--ink);font-weight:700;}
+  .pill{padding:3px 10px;border-radius:999px;font-size:0.7rem;font-weight:700;text-transform:uppercase;}
+  .pill-verified{background:rgba(27,107,104,0.16);color:var(--teal);}
+  .pill-unverified{background:rgba(91,83,72,0.12);color:var(--ink-soft);}
+  .pill-online{background:rgba(92,122,78,0.18);color:var(--leaf);}
+  .pill-offline{background:rgba(91,83,72,0.12);color:var(--ink-soft);}
+  .pill-suspended{background:rgba(191,59,44,0.14);color:var(--signal);}
+
+  .btn-sm{padding:8px 14px;border-radius:7px;border:none;font-weight:600;font-size:0.8rem;cursor:pointer;}
+  .btn-navy{background:var(--navy);color:var(--paper);}
+  .btn-navy:hover{background:var(--ink);}
+  .btn-ghost{background:none;border:1px solid var(--line);color:var(--ink);}
+  .btn-ghost:hover{border-color:var(--ink);}
+
+  .booking-row{
+    background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px;
+  }
+  .booking-row .bk-info{flex:1;min-width:220px;font-size:0.88rem;}
+  .booking-row .bk-info strong{font-family:'Baloo 2',sans-serif;}
+  .booking-row .bk-price{font-family:'IBM Plex Mono',monospace;font-weight:600;}
 </style>
 </head>
 <body>
 
 <header>
   <h1>🛡️ Kaarigar Admin</h1>
-  <p>Payment complaint review</p>
+  <p>Manage customers, workers, bookings & complaints</p>
 </header>
 
 <div class="content" id="mainContent">
   <div class="gate">
     <h2>Checking access…</h2>
   </div>
+</div>
+
+<div class="content" id="adminApp" style="display:none;">
+  <div class="admin-tabs">
+    <button class="admin-tab-btn" data-tab="overview" aria-selected="true">Overview</button>
+    <button class="admin-tab-btn" data-tab="customers" aria-selected="false">Customers</button>
+    <button class="admin-tab-btn" data-tab="workers" aria-selected="false">Workers</button>
+    <button class="admin-tab-btn" data-tab="bookings" aria-selected="false">Bookings</button>
+    <button class="admin-tab-btn" data-tab="complaints" aria-selected="false">Complaints</button>
+  </div>
+
+  <div class="admin-panel active" id="panel-overview"></div>
+  <div class="admin-panel" id="panel-customers"></div>
+  <div class="admin-panel" id="panel-workers"></div>
+  <div class="admin-panel" id="panel-bookings"></div>
+  <div class="admin-panel" id="panel-complaints"></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -99,11 +168,340 @@
 <script>
 (function(){
   const mainContent = document.getElementById('mainContent');
+  const adminApp = document.getElementById('adminApp');
   let complaints = [];
   let activeFilter = 'pending';
 
+  // ---------- New state for Overview / Customers / Workers / Bookings ----------
+  let stats = null;
+  let customers = [];
+  let workersList = [];
+  let bookingsList = [];
+  let customerSearch = '';
+  let workerSearch = '';
+  let bookingStatusFilter = 'all';
+
   function renderGate(html){
+    adminApp.style.display = 'none';
+    mainContent.style.display = '';
     mainContent.innerHTML = '<div class="gate">' + html + '</div>';
+  }
+
+  function fmtDate(d){
+    if(!d) return '—';
+    return new Date(d).toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'});
+  }
+  function fmtMoney(n){
+    return '₹' + Number(n || 0).toLocaleString('en-IN');
+  }
+  function isSuspended(until){
+    return until && new Date(until) > new Date();
+  }
+
+  // ============================================================
+  // TAB SWITCHING
+  // ============================================================
+  document.querySelectorAll('.admin-tab-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      document.querySelectorAll('.admin-tab-btn').forEach(b => b.setAttribute('aria-selected','false'));
+      btn.setAttribute('aria-selected','true');
+      document.querySelectorAll('.admin-panel').forEach(p => p.classList.remove('active'));
+      const tab = btn.dataset.tab;
+      document.getElementById('panel-' + tab).classList.add('active');
+      await loadTab(tab);
+    });
+  });
+
+  async function loadTab(tab){
+    if(tab === 'overview') await loadStats();
+    if(tab === 'customers') await loadCustomers();
+    if(tab === 'workers') await loadWorkers();
+    if(tab === 'bookings') await loadBookings();
+    if(tab === 'complaints') await loadComplaints();
+  }
+
+  // ============================================================
+  // OVERVIEW
+  // ============================================================
+  async function loadStats(){
+    const panel = document.getElementById('panel-overview');
+    panel.innerHTML = '<p style="color:var(--ink-soft);">Loading…</p>';
+    const { data, error } = await supabaseClient.rpc('admin_get_stats');
+    if(error){
+      panel.innerHTML = '<p style="color:var(--signal);">Could not load stats: ' + error.message + '</p>';
+      return;
+    }
+    stats = Array.isArray(data) ? data[0] : data;
+    renderStats();
+  }
+
+  function renderStats(){
+    const s = stats || {};
+    document.getElementById('panel-overview').innerHTML = `
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Total customers</div><div class="stat-value">${s.total_customers ?? 0}</div></div>
+        <div class="stat-card"><div class="stat-label">Total workers</div><div class="stat-value">${s.total_workers ?? 0}</div></div>
+        <div class="stat-card"><div class="stat-label">Suspended customers</div><div class="stat-value">${s.suspended_customers ?? 0}</div></div>
+        <div class="stat-card"><div class="stat-label">Suspended workers</div><div class="stat-value">${s.suspended_workers ?? 0}</div></div>
+        <div class="stat-card"><div class="stat-label">Total bookings</div><div class="stat-value">${s.total_bookings ?? 0}</div></div>
+        <div class="stat-card"><div class="stat-label">Pending bookings</div><div class="stat-value">${s.pending_bookings ?? 0}</div></div>
+        <div class="stat-card"><div class="stat-label">Completed bookings</div><div class="stat-value">${s.completed_bookings ?? 0}</div></div>
+        <div class="stat-card"><div class="stat-label">Pending complaints</div><div class="stat-value">${s.pending_complaints ?? 0}</div></div>
+        <div class="stat-card"><div class="stat-label">Total collected</div><div class="stat-value">${fmtMoney(s.total_collected)}</div></div>
+      </div>
+    `;
+  }
+
+  // ============================================================
+  // CUSTOMERS
+  // ============================================================
+  async function loadCustomers(){
+    const panel = document.getElementById('panel-customers');
+    panel.innerHTML = '<p style="color:var(--ink-soft);">Loading…</p>';
+    const { data, error } = await supabaseClient.rpc('admin_get_customers');
+    if(error){
+      panel.innerHTML = '<p style="color:var(--signal);">Could not load customers: ' + error.message + '</p>';
+      return;
+    }
+    customers = data || [];
+    renderCustomers();
+  }
+
+  function customerCard(c){
+    const suspended = isSuspended(c.suspended_until);
+    return `
+      <div class="data-card ${suspended ? 'suspended' : ''}">
+        <div class="data-top">
+          <div>
+            <div class="data-name">${c.name || '—'}</div>
+            <div class="data-sub">📧 ${c.email || '—'} &nbsp; 📞 ${c.phone || 'not provided'}${c.age ? ' &nbsp; · ' + c.age + ' yrs' : ''}</div>
+          </div>
+          ${suspended ? '<span class="pill pill-suspended">Suspended till ' + fmtDate(c.suspended_until) + '</span>' : ''}
+        </div>
+        <div class="data-meta">
+          <span>Joined <b>${fmtDate(c.created_at)}</b></span>
+          <span>Bookings <b>${c.total_bookings ?? 0}</b></span>
+          <span>Completed <b>${c.completed_bookings ?? 0}</b></span>
+          <span>Total spent <b>${fmtMoney(c.total_spent)}</b></span>
+        </div>
+        <div class="actions">
+          ${suspended
+            ? `<button class="btn-sm btn-navy" data-unsuspend-user="${c.id}">Unsuspend</button>`
+            : `<button class="btn-sm btn-ghost" data-suspend-user="${c.id}">Suspend…</button>`}
+        </div>
+      </div>`;
+  }
+
+  function renderCustomers(){
+    const panel = document.getElementById('panel-customers');
+    const q = customerSearch.trim().toLowerCase();
+    const filtered = q
+      ? customers.filter(c => (c.name||'').toLowerCase().includes(q) || (c.email||'').toLowerCase().includes(q) || (c.phone||'').includes(q))
+      : customers;
+
+    const list = filtered.length
+      ? filtered.map(customerCard).join('')
+      : '<div class="empty-state"><div class="e-icon">👤</div><p>No customers found.</p></div>';
+
+    panel.innerHTML = `
+      <div class="toolbar">
+        <input type="text" class="search-input" id="customerSearchInput" placeholder="Search by name, email or phone…" value="${customerSearch}">
+      </div>
+      ${list}
+    `;
+
+    document.getElementById('customerSearchInput').addEventListener('input', (e) => {
+      customerSearch = e.target.value;
+      renderCustomers();
+      // keep focus + cursor position after re-render
+      const input = document.getElementById('customerSearchInput');
+      input.focus();
+      input.selectionStart = input.selectionEnd = input.value.length;
+    });
+
+    attachSuspendHandlers(panel);
+  }
+
+  // ============================================================
+  // WORKERS
+  // ============================================================
+  async function loadWorkers(){
+    const panel = document.getElementById('panel-workers');
+    panel.innerHTML = '<p style="color:var(--ink-soft);">Loading…</p>';
+    const { data, error } = await supabaseClient.rpc('admin_get_workers');
+    if(error){
+      panel.innerHTML = '<p style="color:var(--signal);">Could not load workers: ' + error.message + '</p>';
+      return;
+    }
+    workersList = data || [];
+    renderWorkers();
+  }
+
+  function workerCard(w){
+    const suspended = isSuspended(w.suspended_until);
+    return `
+      <div class="data-card ${suspended ? 'suspended' : ''}">
+        <div class="data-top">
+          <div>
+            <div class="data-name">${w.name || '—'}</div>
+            <div class="data-sub">🧰 ${w.category || '—'}${w.bio ? ' — ' + w.bio : ''}</div>
+            <div class="data-sub">📧 ${w.email || '—'} &nbsp; 📞 ${w.phone || 'not provided'}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+            <span class="pill ${w.is_online ? 'pill-online' : 'pill-offline'}">${w.is_online ? 'Online' : 'Offline'}</span>
+            <span class="pill ${w.is_verified ? 'pill-verified' : 'pill-unverified'}">${w.is_verified ? 'Verified' : 'Unverified'}</span>
+            ${suspended ? '<span class="pill pill-suspended">Suspended till ' + fmtDate(w.suspended_until) + '</span>' : ''}
+          </div>
+        </div>
+        <div class="data-meta">
+          <span>Joined <b>${fmtDate(w.created_at)}</b></span>
+          <span>Rating <b>${w.rating != null ? Number(w.rating).toFixed(1) + ' ⭐' : '—'}</b></span>
+          <span>Jobs completed <b>${w.jobs_completed ?? 0}</b></span>
+          <span>Services listed <b>${w.services_count ?? 0}</b></span>
+        </div>
+        <div class="actions">
+          ${suspended
+            ? `<button class="btn-sm btn-navy" data-unsuspend-user="${w.profile_id}">Unsuspend</button>`
+            : `<button class="btn-sm btn-ghost" data-suspend-user="${w.profile_id}">Suspend…</button>`}
+          <button class="btn-sm ${w.is_verified ? 'btn-ghost' : 'btn-navy'}" data-toggle-verify="${w.worker_id}" data-verified="${w.is_verified}">
+            ${w.is_verified ? 'Remove verification' : 'Mark verified'}
+          </button>
+        </div>
+      </div>`;
+  }
+
+  function renderWorkers(){
+    const panel = document.getElementById('panel-workers');
+    const q = workerSearch.trim().toLowerCase();
+    const filtered = q
+      ? workersList.filter(w => (w.name||'').toLowerCase().includes(q) || (w.category||'').toLowerCase().includes(q) || (w.email||'').toLowerCase().includes(q) || (w.phone||'').includes(q))
+      : workersList;
+
+    const list = filtered.length
+      ? filtered.map(workerCard).join('')
+      : '<div class="empty-state"><div class="e-icon">🧰</div><p>No workers found.</p></div>';
+
+    panel.innerHTML = `
+      <div class="toolbar">
+        <input type="text" class="search-input" id="workerSearchInput" placeholder="Search by name, category, email or phone…" value="${workerSearch}">
+      </div>
+      ${list}
+    `;
+
+    document.getElementById('workerSearchInput').addEventListener('input', (e) => {
+      workerSearch = e.target.value;
+      renderWorkers();
+      const input = document.getElementById('workerSearchInput');
+      input.focus();
+      input.selectionStart = input.selectionEnd = input.value.length;
+    });
+
+    attachSuspendHandlers(panel);
+
+    panel.querySelectorAll('[data-toggle-verify]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const nowVerified = btn.dataset.verified === 'true';
+        const { error } = await supabaseClient.rpc('admin_set_worker_verified', {
+          p_worker_id: btn.dataset.toggleVerify, p_verified: !nowVerified
+        });
+        if(error){ alert('Failed: ' + error.message); return; }
+        await loadWorkers();
+      });
+    });
+  }
+
+  // ---------- Shared suspend/unsuspend handlers (customers + workers) ----------
+  function attachSuspendHandlers(panel){
+    panel.querySelectorAll('[data-suspend-user]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const daysStr = prompt('Suspend for how many days?', '7');
+        if(!daysStr) return;
+        const days = Number(daysStr);
+        if(!days || days <= 0){ alert('Enter a valid number of days.'); return; }
+        const { error } = await supabaseClient.rpc('admin_suspend_user', {
+          p_profile_id: btn.dataset.suspendUser, p_days: days
+        });
+        if(error){ alert('Failed: ' + error.message); return; }
+        await loadCustomers();
+        await loadWorkers();
+      });
+    });
+    panel.querySelectorAll('[data-unsuspend-user]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if(!confirm('Lift this suspension now?')) return;
+        const { error } = await supabaseClient.rpc('admin_unsuspend_user', {
+          p_profile_id: btn.dataset.unsuspendUser
+        });
+        if(error){ alert('Failed: ' + error.message); return; }
+        await loadCustomers();
+        await loadWorkers();
+      });
+    });
+  }
+
+  // ============================================================
+  // BOOKINGS
+  // ============================================================
+  async function loadBookings(){
+    const panel = document.getElementById('panel-bookings');
+    panel.innerHTML = '<p style="color:var(--ink-soft);">Loading…</p>';
+    const { data, error } = await supabaseClient.rpc('admin_get_bookings');
+    if(error){
+      panel.innerHTML = '<p style="color:var(--signal);">Could not load bookings: ' + error.message + '</p>';
+      return;
+    }
+    bookingsList = data || [];
+    renderBookings();
+  }
+
+  function bookingRow(b){
+    return `
+      <div class="booking-row">
+        <div class="bk-info">
+          <strong>${b.customer_name || '—'}</strong> → <strong>${b.worker_name || '—'}</strong><br>
+          <span style="color:var(--ink-soft);">${b.service_name || '—'} · ${fmtDate(b.created_at)}</span>
+        </div>
+        <span class="bk-price">${fmtMoney(b.price)}</span>
+        <span class="status-badge status-${b.status}">${b.status}</span>
+        ${(b.status === 'pending' || b.status === 'accepted')
+          ? `<button class="btn-sm btn-ghost" data-cancel-booking="${b.id}">Cancel</button>` : ''}
+      </div>`;
+  }
+
+  function renderBookings(){
+    const panel = document.getElementById('panel-bookings');
+    const filtered = bookingStatusFilter === 'all'
+      ? bookingsList
+      : bookingsList.filter(b => b.status === bookingStatusFilter);
+
+    const list = filtered.length
+      ? filtered.map(bookingRow).join('')
+      : '<div class="empty-state"><div class="e-icon">📋</div><p>No bookings here.</p></div>';
+
+    panel.innerHTML = `
+      <div class="filters">
+        <button class="filter-btn" data-bfilter="all" aria-selected="${bookingStatusFilter==='all'}">All</button>
+        <button class="filter-btn" data-bfilter="pending" aria-selected="${bookingStatusFilter==='pending'}">Pending</button>
+        <button class="filter-btn" data-bfilter="accepted" aria-selected="${bookingStatusFilter==='accepted'}">Accepted</button>
+        <button class="filter-btn" data-bfilter="completed" aria-selected="${bookingStatusFilter==='completed'}">Completed</button>
+        <button class="filter-btn" data-bfilter="cancelled" aria-selected="${bookingStatusFilter==='cancelled'}">Cancelled</button>
+      </div>
+      ${list}
+    `;
+
+    panel.querySelectorAll('[data-bfilter]').forEach(btn => {
+      btn.addEventListener('click', () => { bookingStatusFilter = btn.dataset.bfilter; renderBookings(); });
+    });
+    panel.querySelectorAll('[data-cancel-booking]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if(!confirm('Cancel this booking?')) return;
+        const { error } = await supabaseClient.rpc('admin_update_booking_status', {
+          p_booking_id: btn.dataset.cancelBooking, p_new_status: 'cancelled'
+        });
+        if(error){ alert('Failed: ' + error.message); return; }
+        await loadBookings();
+      });
+    });
   }
 
   async function signIn(){
@@ -205,13 +603,14 @@
       </div>`;
   }
 
-  function render(){
+  function renderComplaints(){
+    const panel = document.getElementById('panel-complaints');
     const filtered = activeFilter === 'all' ? complaints : complaints.filter(c => c.status === activeFilter);
     const list = filtered.length
       ? filtered.map(complaintCard).join('')
       : '<div class="empty-state"><div class="e-icon">✅</div><p>Nothing here.</p></div>';
 
-    mainContent.innerHTML = `
+    panel.innerHTML = `
       <div class="filters">
         <button class="filter-btn" data-filter="pending" aria-selected="${activeFilter==='pending'}">Pending</button>
         <button class="filter-btn" data-filter="suspended" aria-selected="${activeFilter==='suspended'}">Suspended</button>
@@ -221,10 +620,10 @@
       ${list}
     `;
 
-    mainContent.querySelectorAll('[data-filter]').forEach(btn => {
-      btn.addEventListener('click', () => { activeFilter = btn.dataset.filter; render(); });
+    panel.querySelectorAll('[data-filter]').forEach(btn => {
+      btn.addEventListener('click', () => { activeFilter = btn.dataset.filter; renderComplaints(); });
     });
-    mainContent.querySelectorAll('[data-suspend]').forEach(btn => {
+    panel.querySelectorAll('[data-suspend]').forEach(btn => {
       btn.addEventListener('click', async () => {
         if(!confirm('Suspend this customer for 7 days?')) return;
         const { error } = await supabaseClient.rpc('admin_suspend_customer', {
@@ -234,7 +633,7 @@
         await loadComplaints();
       });
     });
-    mainContent.querySelectorAll('[data-dismiss]').forEach(btn => {
+    panel.querySelectorAll('[data-dismiss]').forEach(btn => {
       btn.addEventListener('click', async () => {
         if(!confirm('Dismiss this complaint with no action?')) return;
         const { error } = await supabaseClient.rpc('admin_dismiss_complaint', { p_complaint_id: btn.dataset.dismiss });
@@ -242,7 +641,7 @@
         await loadComplaints();
       });
     });
-    mainContent.querySelectorAll('[data-unsuspend]').forEach(btn => {
+    panel.querySelectorAll('[data-unsuspend]').forEach(btn => {
       btn.addEventListener('click', async () => {
         if(!confirm('Lift this suspension now?')) return;
         const { error } = await supabaseClient.rpc('admin_unsuspend_customer', { p_customer_id: btn.dataset.unsuspend });
@@ -253,13 +652,14 @@
   }
 
   async function loadComplaints(){
+    const panel = document.getElementById('panel-complaints');
     const { data, error } = await supabaseClient.rpc('admin_get_complaints');
     if(error){
-      renderGate('<h2>Could not load complaints</h2><p>' + error.message + '</p>');
+      panel.innerHTML = '<p style="color:var(--signal);">Could not load complaints: ' + error.message + '</p>';
       return;
     }
     complaints = data || [];
-    render();
+    renderComplaints();
   }
 
   async function init(){
@@ -280,7 +680,10 @@
       return;
     }
 
-    await loadComplaints();
+    // Authorized — show the tabbed app and load the first tab.
+    mainContent.style.display = 'none';
+    adminApp.style.display = '';
+    await loadStats();
   }
 
   init();
