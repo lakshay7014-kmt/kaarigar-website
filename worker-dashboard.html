@@ -255,21 +255,7 @@
       <!-- PROFILE -->
       <div class="view" id="view-profile">
         <div class="greeting"><h2>Profile</h2></div>
-        <div class="stat-card" style="max-width:480px;">
-          <div style="display:flex;gap:14px;align-items:center;margin-bottom:16px;">
-            <div class="avatar" style="width:56px;height:56px;font-size:1.3rem;">R</div>
-            <div>
-              <div style="font-family:'Baloo 2';font-weight:700;font-size:1.1rem;">Ramesh Kumar</div>
-              <div style="color:var(--ink-soft);font-size:0.85rem;">AC & Appliance Repair · 5 yrs experience</div>
-            </div>
-          </div>
-          <div style="color:var(--ink-soft);font-size:0.88rem;line-height:1.7;">
-            📍 Service radius: 5 km<br>
-            🗣️ Languages: Hindi, English<br>
-            ✅ Identity verified<br>
-            📄 Certificates: 2 uploaded
-          </div>
-        </div>
+        <div id="profileCard"></div>
       </div>
 
     </div>
@@ -291,6 +277,7 @@
   // ---------- State ----------
   let profileUid = null;  // real profile id, set after checking the session
   let workerRow = null;    // this worker's own row in the `workers` table
+  let myProfile = null;    // this worker's own profiles row (name, phone, address, dob…)
   let requests = [];       // pending bookings needing accept/decline
   let workerBookings = []; // accepted/completed bookings
   let services = [];
@@ -363,6 +350,42 @@
         <div class="request-actions">
           <button class="accept-btn" data-accept="${r.id}">Accept</button>
           <button class="decline-btn" data-decline="${r.id}">Decline</button>
+        </div>
+      </div>`;
+  }
+
+  function fmtDate(d){
+    if(!d) return '—';
+    return new Date(d).toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'});
+  }
+
+  function renderProfile(){
+    const card = document.getElementById('profileCard');
+    if(!card || !myProfile) return;
+
+    const name = myProfile.name || 'Your name';
+    const initial = name.charAt(0).toUpperCase();
+    const category = (workerRow && workerRow.category) || 'Not set yet';
+    const bio = workerRow && workerRow.bio ? workerRow.bio : '';
+    const rating = workerRow && workerRow.rating != null ? Number(workerRow.rating).toFixed(1) + ' ⭐' : 'No ratings yet';
+    const jobs = (workerRow && workerRow.jobs_completed) || 0;
+
+    card.innerHTML = `
+      <div class="stat-card" style="max-width:480px;">
+        <div style="display:flex;gap:14px;align-items:center;margin-bottom:16px;">
+          <div class="avatar" style="width:56px;height:56px;font-size:1.3rem;">${initial}</div>
+          <div>
+            <div style="font-family:'Baloo 2';font-weight:700;font-size:1.1rem;">${name}</div>
+            <div style="color:var(--ink-soft);font-size:0.85rem;">${category}${bio ? ' — ' + bio : ''}</div>
+          </div>
+        </div>
+        <div style="color:var(--ink-soft);font-size:0.88rem;line-height:1.9;">
+          📞 ${myProfile.phone || 'not provided'}<br>
+          📧 ${myProfile.email || 'not provided'}<br>
+          🏠 ${myProfile.address || 'not provided'}<br>
+          🎂 Date of birth: ${fmtDate(myProfile.dob)}<br>
+          ⭐ Rating: ${rating} &nbsp; · &nbsp; ✅ Jobs completed: ${jobs}<br>
+          ${myProfile.verification_status === 'verified' ? '✅ Identity verified' : '⏳ Verification: ' + (myProfile.verification_status || 'incomplete')}
         </div>
       </div>`;
   }
@@ -575,7 +598,7 @@
 
     const { data: profile, error } = await supabaseClient
       .from('profiles')
-      .select('id, name, phone, address, dob, role, suspended_until, verification_status, verification_note')
+      .select('id, name, email, phone, address, dob, role, suspended_until, verification_status, verification_note')
       .eq('user_id', session.user.id)
       .eq('role', 'worker')
       .maybeSingle();
@@ -608,6 +631,7 @@
     }
 
     profileUid = profile.id;
+    myProfile = profile;
     document.getElementById('greetingName').textContent = 'Namaste, ' + profile.name + ' 👋';
     document.querySelector('.avatar').textContent = (profile.name || 'W').charAt(0).toUpperCase();
     return true;
@@ -738,6 +762,7 @@
     renderWorkerBookings();
     renderServices();
     renderEarnings();
+    renderProfile();
   })();
 })();
 </script>

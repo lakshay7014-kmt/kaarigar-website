@@ -207,6 +207,7 @@
     <button class="nav-item" data-view="favorites"><span class="icon">❤️</span> Favorites</button>
     <button class="nav-item" data-view="chat"><span class="icon">💬</span> Messages</button>
     <div class="nav-sep"></div>
+    <button class="nav-item" data-view="profile"><span class="icon">👤</span> Profile</button>
     <button class="nav-item" data-view="settings"><span class="icon">⚙️</span> Settings</button>
     <button class="nav-item" id="logoutBtn"><span class="icon">🚪</span> Log out</button>
     <div class="sidebar-bottom">
@@ -272,6 +273,12 @@
           <div class="e-icon">💬</div>
           <p>Chat opens once you have an active booking with a worker.</p>
         </div>
+      </div>
+
+      <!-- PROFILE -->
+      <div class="view" id="view-profile">
+        <div class="greeting"><h2>Profile</h2></div>
+        <div id="profileCard"></div>
       </div>
 
       <!-- SETTINGS (placeholder) -->
@@ -347,6 +354,7 @@
 
   // ---------- State ----------
   let uid = null;         // real profile id, set after checking the session
+  let myProfile = null;   // this customer's own profiles row (name, phone, address, dob…)
   let workers = [];       // real rows from Supabase, joined with profile + services
   let bookings = [];
   let favoriteIds = new Set();
@@ -438,6 +446,37 @@
       ? filtered.map(workerCard).join('')
       : '<div class="empty-state" style="grid-column:1/-1;"><div class="e-icon">🔍</div><p>No workers match that search yet.</p></div>';
     attachCardHandlers(grid);
+  }
+
+  function fmtDate(d){
+    if(!d) return '—';
+    return new Date(d).toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'});
+  }
+
+  function renderProfile(){
+    const card = document.getElementById('profileCard');
+    if(!card || !myProfile) return;
+
+    const name = myProfile.name || 'Your name';
+    const initial = name.charAt(0).toUpperCase();
+
+    card.innerHTML = `
+      <div class="stat-card" style="max-width:480px;">
+        <div style="display:flex;gap:14px;align-items:center;margin-bottom:16px;">
+          <div class="avatar" style="width:56px;height:56px;font-size:1.3rem;">${initial}</div>
+          <div>
+            <div style="font-family:'Baloo 2';font-weight:700;font-size:1.1rem;">${name}</div>
+            <div style="color:var(--ink-soft);font-size:0.85rem;">Customer</div>
+          </div>
+        </div>
+        <div style="color:var(--ink-soft);font-size:0.88rem;line-height:1.9;">
+          📞 ${myProfile.phone || 'not provided'}<br>
+          📧 ${myProfile.email || 'not provided'}<br>
+          🏠 ${myProfile.address || 'not provided'}<br>
+          🎂 Date of birth: ${fmtDate(myProfile.dob)}<br>
+          ${myProfile.verification_status === 'verified' ? '✅ Identity verified' : '⏳ Verification: ' + (myProfile.verification_status || 'incomplete')}
+        </div>
+      </div>`;
   }
 
   function renderFavorites(){
@@ -657,7 +696,7 @@
 
     const { data: profile, error } = await supabaseClient
       .from('profiles')
-      .select('id, name, phone, address, dob, role, suspended_until, verification_status, verification_note')
+      .select('id, name, email, phone, address, dob, role, suspended_until, verification_status, verification_note')
       .eq('user_id', session.user.id)
       .eq('role', 'customer')
       .maybeSingle();
@@ -690,6 +729,7 @@
     }
 
     uid = profile.id;
+    myProfile = profile;
     document.getElementById('greetingName').textContent = 'Namaste, ' + profile.name + ' 👋';
     document.querySelector('.avatar').textContent = (profile.name || 'C').charAt(0).toUpperCase();
     return true;
@@ -814,6 +854,7 @@
     renderWorkerGrid();
     renderFavorites();
     renderBookings();
+    renderProfile();
   })();
 })();
 </script>
