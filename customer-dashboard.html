@@ -193,6 +193,24 @@
   .verify-form small{display:block;color:var(--ink-soft);font-size:0.78rem;margin-top:5px;}
   .verify-error{color:var(--signal);font-size:0.85rem;margin-bottom:14px;display:none;}
   .verify-error.show{display:block;}
+
+  /* ---------- Live selfie capture ---------- */
+  .selfie-box{border:2px dashed var(--line);border-radius:10px;padding:16px;text-align:center;background:var(--wall);}
+  .selfie-video,.selfie-preview{width:100%;max-width:260px;height:260px;border-radius:10px;margin:0 auto 12px;display:block;object-fit:cover;background:#000;}
+  .selfie-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:6px;}
+  .btn-camera{padding:9px 16px;border-radius:7px;border:1px solid var(--line);background:var(--paper);font-weight:600;font-size:0.85rem;cursor:pointer;}
+  .btn-camera:hover{border-color:var(--ink);}
+  .selfie-hint{color:var(--ink-soft);font-size:0.78rem;}
+  .selfie-error{color:var(--signal);font-size:0.82rem;margin-top:6px;}
+
+  /* ---------- Profile picture ---------- */
+  .avatar-lg{
+    width:72px;height:72px;border-radius:50%;background:var(--rose);color:var(--paper);
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-family:'Baloo 2';
+    font-size:1.5rem;background-size:cover;background-position:center;flex-shrink:0;
+  }
+  .change-photo-btn{font-size:0.78rem;font-weight:700;color:var(--navy);text-decoration:underline;cursor:pointer;background:none;border:none;padding:0;margin-top:6px;display:inline-block;}
+  .change-photo-btn:disabled{opacity:0.6;cursor:default;}
 </style>
 </head>
 <body>
@@ -459,14 +477,19 @@
 
     const name = myProfile.name || 'Your name';
     const initial = name.charAt(0).toUpperCase();
+    const avatarUrl = avatarPublicUrl(myProfile.avatar_path);
+    const avatarStyle = avatarUrl ? `background-image:url('${avatarUrl}');` : '';
 
     card.innerHTML = `
       <div class="stat-card" style="max-width:480px;">
-        <div style="display:flex;gap:14px;align-items:center;margin-bottom:16px;">
-          <div class="avatar" style="width:56px;height:56px;font-size:1.3rem;">${initial}</div>
+        <div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:16px;">
+          <div class="avatar-lg" id="profileAvatarLg" style="${avatarStyle}">${avatarUrl ? '' : initial}</div>
           <div>
             <div style="font-family:'Baloo 2';font-weight:700;font-size:1.1rem;">${name}</div>
             <div style="color:var(--ink-soft);font-size:0.85rem;">Customer</div>
+            <button type="button" class="change-photo-btn" id="changePhotoBtn">Change photo</button>
+            <input type="file" id="avatarFileInput" accept="image/*" style="display:none;">
+            <div id="avatarStatus" style="font-size:0.78rem;color:var(--ink-soft);margin-top:4px;"></div>
           </div>
         </div>
         <div style="color:var(--ink-soft);font-size:0.88rem;line-height:1.9;">
@@ -477,6 +500,44 @@
           ${myProfile.verification_status === 'verified' ? '✅ Identity verified' : '⏳ Verification: ' + (myProfile.verification_status || 'incomplete')}
         </div>
       </div>`;
+
+    const changeBtn = document.getElementById('changePhotoBtn');
+    const fileInput = document.getElementById('avatarFileInput');
+    const statusEl = document.getElementById('avatarStatus');
+
+    changeBtn.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files[0];
+      if(!file) return;
+
+      changeBtn.disabled = true;
+      statusEl.textContent = 'Uploading…';
+
+      try{
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+        const path = `${session.user.id}/avatar-${Date.now()}-${safeName}`;
+
+        const { error: uploadErr } = await supabaseClient
+          .storage.from('avatars')
+          .upload(path, file, { upsert: false });
+        if(uploadErr) throw uploadErr;
+
+        const { error: rpcErr } = await supabaseClient.rpc('update_avatar', {
+          p_profile_id: myProfile.id, p_avatar_path: path
+        });
+        if(rpcErr) throw rpcErr;
+
+        myProfile.avatar_path = path;
+        applyAvatar(document.querySelector('.topbar .avatar'), myProfile);
+        statusEl.textContent = 'Photo updated!';
+        renderProfile();
+      } catch(err){
+        statusEl.textContent = 'Could not update photo: ' + (err.message || err);
+        changeBtn.disabled = false;
+      }
+    });
   }
 
   function renderFavorites(){
@@ -696,7 +757,7 @@
 
     const { data: profile, error } = await supabaseClient
       .from('profiles')
-      .select('id, name, email, phone, address, dob, role, suspended_until, verification_status, verification_note')
+      .select('id, name, email, phone, address, dob, role, suspended_until, verification_status, verification_note, avatar_path, live_photo_path')
       .eq('user_id', session.user.id)
       .eq('role', 'customer')
       .maybeSingle();
@@ -731,8 +792,25 @@
     uid = profile.id;
     myProfile = profile;
     document.getElementById('greetingName').textContent = 'Namaste, ' + profile.name + ' 👋';
-    document.querySelector('.avatar').textContent = (profile.name || 'C').charAt(0).toUpperCase();
+    applyAvatar(document.querySelector('.avatar'), profile);
     return true;
+  }
+
+  // ---------- Avatar helper (shared by topbar + profile view) ----------
+  function avatarPublicUrl(path){
+    if(!path) return null;
+    return supabaseClient.storage.from('avatars').getPublicUrl(path).data.publicUrl;
+  }
+  function applyAvatar(el, profile){
+    if(!el) return;
+    const url = avatarPublicUrl(profile.avatar_path);
+    if(url){
+      el.style.backgroundImage = `url('${url}')`;
+      el.textContent = '';
+    } else {
+      el.style.backgroundImage = '';
+      el.textContent = (profile.name || 'C').charAt(0).toUpperCase();
+    }
   }
 
   // ---------- Profile completion / verification gate ----------
@@ -788,6 +866,21 @@
             <input type="file" id="vf-id-doc" accept="image/*,.pdf" required>
             <small>Photo or scan, clearly readable. JPG, PNG or PDF.</small>
           </div>
+          <div class="form-field">
+            <label>Live photo (selfie)</label>
+            <div class="selfie-box" id="selfieBox">
+              <video id="selfieVideo" class="selfie-video" autoplay playsinline muted style="display:none;"></video>
+              <img id="selfiePreview" class="selfie-preview" style="display:none;">
+              <canvas id="selfieCanvas" style="display:none;"></canvas>
+              <div class="selfie-actions">
+                <button type="button" class="btn-camera" id="openCameraBtn">📷 Open camera</button>
+                <button type="button" class="btn-camera" id="captureBtn" style="display:none;">⬤ Capture</button>
+                <button type="button" class="btn-camera" id="retakeBtn" style="display:none;">↺ Retake</button>
+              </div>
+              <div class="selfie-hint">Live selfie only, please — not a photo from your gallery.</div>
+              <div class="selfie-error" id="selfieError" style="display:none;"></div>
+            </div>
+          </div>
           <button type="submit" class="modal-submit" id="verifySubmitBtn">Submit for verification</button>
         </form>
       </div>`;
@@ -796,6 +889,67 @@
   function renderVerifyGate(profile, authUserId, roleLabel){
     document.querySelector('.content').innerHTML = verifyGateHtml(profile);
     if(profile.verification_status === 'pending') return;
+
+    // ---------- Live selfie capture ----------
+    let cameraStream = null;
+    let capturedBlob = null;
+    const selfieError = document.getElementById('selfieError');
+    const videoEl = document.getElementById('selfieVideo');
+    const previewEl = document.getElementById('selfiePreview');
+    const canvasEl = document.getElementById('selfieCanvas');
+    const openCameraBtn = document.getElementById('openCameraBtn');
+    const captureBtn = document.getElementById('captureBtn');
+    const retakeBtn = document.getElementById('retakeBtn');
+
+    function showSelfieError(msg){
+      selfieError.textContent = msg;
+      selfieError.style.display = 'block';
+    }
+
+    async function openCamera(){
+      selfieError.style.display = 'none';
+      try{
+        cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+        videoEl.srcObject = cameraStream;
+        videoEl.style.display = 'block';
+        previewEl.style.display = 'none';
+        openCameraBtn.style.display = 'none';
+        captureBtn.style.display = '';
+        retakeBtn.style.display = 'none';
+      } catch(err){
+        showSelfieError('Could not access your camera. Please allow camera permission and try again.');
+      }
+    }
+
+    function stopCamera(){
+      if(cameraStream){
+        cameraStream.getTracks().forEach(t => t.stop());
+        cameraStream = null;
+      }
+    }
+
+    openCameraBtn.addEventListener('click', openCamera);
+
+    captureBtn.addEventListener('click', () => {
+      canvasEl.width = videoEl.videoWidth;
+      canvasEl.height = videoEl.videoHeight;
+      canvasEl.getContext('2d').drawImage(videoEl, 0, 0);
+      canvasEl.toBlob((blob) => {
+        capturedBlob = blob;
+        previewEl.src = URL.createObjectURL(blob);
+        previewEl.style.display = 'block';
+        videoEl.style.display = 'none';
+        captureBtn.style.display = 'none';
+        retakeBtn.style.display = '';
+        stopCamera();
+      }, 'image/jpeg', 0.92);
+    });
+
+    retakeBtn.addEventListener('click', () => {
+      capturedBlob = null;
+      previewEl.style.display = 'none';
+      openCamera();
+    });
 
     document.getElementById('verifyForm').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -814,6 +968,11 @@
         errorEl.classList.add('show');
         return;
       }
+      if(!capturedBlob){
+        errorEl.textContent = 'Please capture a live selfie before submitting.';
+        errorEl.classList.add('show');
+        return;
+      }
 
       const btn = document.getElementById('verifySubmitBtn');
       btn.disabled = true;
@@ -821,16 +980,23 @@
 
       try{
         const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-        const path = `${authUserId}/${profile.id}-${Date.now()}-${safeName}`;
+        const docPath = `${authUserId}/${profile.id}-${Date.now()}-${safeName}`;
+        const selfiePath = `${authUserId}/${profile.id}-selfie-${Date.now()}.jpg`;
 
         const { error: uploadErr } = await supabaseClient
           .storage.from('verification-docs')
-          .upload(path, file, { upsert: false });
+          .upload(docPath, file, { upsert: false });
         if(uploadErr) throw uploadErr;
+
+        const { error: selfieUploadErr } = await supabaseClient
+          .storage.from('verification-docs')
+          .upload(selfiePath, capturedBlob, { upsert: false, contentType: 'image/jpeg' });
+        if(selfieUploadErr) throw selfieUploadErr;
 
         const { error: submitErr } = await supabaseClient.rpc('submit_verification', {
           p_profile_id: profile.id, p_name: name, p_phone: phone,
-          p_address: address, p_dob: dob, p_id_document_path: path
+          p_address: address, p_dob: dob, p_id_document_path: docPath,
+          p_live_photo_path: selfiePath
         });
         if(submitErr) throw submitErr;
 

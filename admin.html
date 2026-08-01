@@ -326,6 +326,10 @@
         ${v.id_document_path
           ? `<a class="doc-link" data-view-doc="${v.id_document_path}">📄 View uploaded ID document</a>`
           : '<span style="color:var(--signal);font-size:0.85rem;">No ID document on file</span>'}
+        <br>
+        ${v.live_photo_path
+          ? `<a class="doc-link" data-view-doc="${v.live_photo_path}">🤳 View live selfie</a>`
+          : '<span style="color:var(--signal);font-size:0.85rem;">No live photo on file</span>'}
         <div class="actions" style="margin-top:14px;">
           <button class="btn btn-approve" data-approve="${v.profile_id}">Approve</button>
           <button class="btn btn-reject" data-reject="${v.profile_id}">Reject</button>
@@ -392,15 +396,30 @@
     return `<span class="pill pill-status-${s}">${labels[s] || s}</span>`;
   }
 
+  function avatarPublicUrl(path){
+    if(!path) return null;
+    return supabaseClient.storage.from('avatars').getPublicUrl(path).data.publicUrl;
+  }
+  function avatarThumb(path, name){
+    const url = avatarPublicUrl(path);
+    const initial = (name || '?').charAt(0).toUpperCase();
+    return url
+      ? `<div style="width:44px;height:44px;border-radius:50%;background-image:url('${url}');background-size:cover;background-position:center;flex-shrink:0;"></div>`
+      : `<div style="width:44px;height:44px;border-radius:50%;background:var(--navy);color:var(--paper);display:flex;align-items:center;justify-content:center;font-weight:700;font-family:'Baloo 2';flex-shrink:0;">${initial}</div>`;
+  }
+
   function customerCard(c){
     const suspended = isSuspended(c.suspended_until);
     return `
       <div class="data-card ${suspended ? 'suspended' : ''}">
         <div class="data-top">
-          <div>
-            <div class="data-name">${c.name || '—'}</div>
-            <div class="data-sub">📧 ${c.email || '—'} &nbsp; 📞 ${c.phone || 'not provided'}${c.age ? ' &nbsp; · ' + c.age + ' yrs' : ''}</div>
-            <div class="data-sub">🏠 ${c.address || 'no address on file'}</div>
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            ${avatarThumb(c.avatar_path, c.name)}
+            <div>
+              <div class="data-name">${c.name || '—'}</div>
+              <div class="data-sub">📧 ${c.email || '—'} &nbsp; 📞 ${c.phone || 'not provided'}${c.age ? ' &nbsp; · ' + c.age + ' yrs' : ''}</div>
+              <div class="data-sub">🏠 ${c.address || 'no address on file'}</div>
+            </div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
             ${verificationPill(c.verification_status)}
@@ -540,11 +559,14 @@
     return `
       <div class="data-card ${suspended ? 'suspended' : ''}">
         <div class="data-top">
-          <div>
-            <div class="data-name">${w.name || '—'}</div>
-            <div class="data-sub">🧰 ${w.category || '—'}${w.bio ? ' — ' + w.bio : ''}</div>
-            <div class="data-sub">📧 ${w.email || '—'} &nbsp; 📞 ${w.phone || 'not provided'}</div>
-            <div class="data-sub">🏠 ${w.address || 'no address on file'}</div>
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            ${avatarThumb(w.avatar_path, w.name)}
+            <div>
+              <div class="data-name">${w.name || '—'}</div>
+              <div class="data-sub">🧰 ${w.category || '—'}${w.bio ? ' — ' + w.bio : ''}</div>
+              <div class="data-sub">📧 ${w.email || '—'} &nbsp; 📞 ${w.phone || 'not provided'}</div>
+              <div class="data-sub">🏠 ${w.address || 'no address on file'}</div>
+            </div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
             <span class="pill ${w.is_online ? 'pill-online' : 'pill-offline'}">${w.is_online ? 'Online' : 'Offline'}</span>
