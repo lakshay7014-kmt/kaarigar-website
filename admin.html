@@ -114,8 +114,28 @@
   .btn-sm{padding:8px 14px;border-radius:7px;border:none;font-weight:600;font-size:0.8rem;cursor:pointer;}
   .btn-navy{background:var(--navy);color:var(--paper);}
   .btn-navy:hover{background:var(--ink);}
+  .btn-danger{background:var(--signal);color:var(--paper);}
+  .btn-danger:hover{background:#8a2318;}
   .btn-ghost{background:none;border:1px solid var(--line);color:var(--ink);}
   .btn-ghost:hover{border-color:var(--ink);}
+
+  .pw-modal-overlay{
+    position:fixed;inset:0;background:rgba(33,29,24,0.55);display:none;
+    align-items:center;justify-content:center;z-index:200;padding:20px;
+  }
+  .pw-modal-overlay.open{display:flex;}
+  .pw-modal-box{
+    background:var(--paper);border-radius:12px;max-width:380px;width:100%;
+    padding:26px;box-shadow:0 20px 50px rgba(0,0,0,0.35);
+  }
+  .pw-modal-box h3{font-size:1.1rem;margin-bottom:8px;}
+  .pw-modal-box p{color:var(--ink-soft);font-size:0.85rem;margin-bottom:16px;}
+  .pw-modal-box input{
+    width:100%;padding:12px 14px;border-radius:8px;border:2px solid var(--line);
+    font-size:1rem;margin-bottom:10px;
+  }
+  .pw-modal-error{color:var(--signal);font-size:0.82rem;margin-bottom:10px;display:none;}
+  .pw-modal-actions{display:flex;gap:10px;justify-content:flex-end;}
 
   .booking-row{
     background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);
@@ -181,6 +201,20 @@
   <div class="admin-panel" id="panel-workers"></div>
   <div class="admin-panel" id="panel-bookings"></div>
   <div class="admin-panel" id="panel-complaints"></div>
+</div>
+
+<!-- ================= PASSWORD CONFIRM MODAL (for destructive actions) ================= -->
+<div class="pw-modal-overlay" id="pwModalOverlay">
+  <div class="pw-modal-box">
+    <h3 id="pwModalTitle">Confirm it's you</h3>
+    <p id="pwModalMessage">Re-enter your admin password to continue.</p>
+    <input type="password" id="pwModalInput" placeholder="Admin password" autocomplete="current-password">
+    <div class="pw-modal-error" id="pwModalError"></div>
+    <div class="pw-modal-actions">
+      <button class="btn-sm btn-ghost" id="pwModalCancel">Cancel</button>
+      <button class="btn-sm btn-danger" id="pwModalConfirm">Confirm</button>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -437,6 +471,7 @@
             ? `<button class="btn-sm btn-navy" data-unsuspend-user="${c.id}">Unsuspend</button>`
             : `<button class="btn-sm btn-ghost" data-suspend-user="${c.id}">Suspend…</button>`}
           <button class="btn-sm btn-ghost" data-edit-customer="${c.id}">Edit profile</button>
+          <button class="btn-sm btn-danger" data-delete-user="${c.id}" data-delete-name="${(c.name||'this customer').replace(/"/g,'&quot;')}">Delete profile</button>
         </div>
         <div class="edit-form-slot" id="edit-customer-${c.id}"></div>
       </div>`;
@@ -589,6 +624,7 @@
             ${w.is_verified ? 'Remove verification' : 'Mark verified'}
           </button>
           <button class="btn-sm btn-ghost" data-edit-worker="${w.profile_id}">Edit profile</button>
+          <button class="btn-sm btn-danger" data-delete-user="${w.profile_id}" data-delete-name="${(w.name||'this worker').replace(/"/g,'&quot;')}">Delete profile</button>
         </div>
         <div class="edit-form-slot" id="edit-worker-${w.profile_id}"></div>
       </div>`;
@@ -671,6 +707,92 @@
           p_profile_id: btn.dataset.unsuspendUser
         });
         if(error){ alert('Failed: ' + error.message); return; }
+        await loadCustomers();
+        await loadWorkers();
+      });
+    });
+    attachDeleteHandlers(panel);
+  }
+
+  // ---------- Password re-confirmation modal (for destructive actions) ----------
+  function confirmAdminPassword(title, message){
+    return new Promise((resolve) => {
+      const overlay = document.getElementById('pwModalOverlay');
+      const input = document.getElementById('pwModalInput');
+      const errorEl = document.getElementById('pwModalError');
+      const confirmBtn = document.getElementById('pwModalConfirm');
+      const cancelBtn = document.getElementById('pwModalCancel');
+
+      document.getElementById('pwModalTitle').textContent = title;
+      document.getElementById('pwModalMessage').textContent = message;
+      input.value = '';
+      errorEl.style.display = 'none';
+      overlay.classList.add('open');
+      setTimeout(() => input.focus(), 50);
+
+      function cleanup(result){
+        overlay.classList.remove('open');
+        confirmBtn.removeEventListener('click', onConfirm);
+        cancelBtn.removeEventListener('click', onCancel);
+        input.removeEventListener('keydown', onKeydown);
+        resolve(result);
+      }
+
+      async function onConfirm(){
+        const password = input.value;
+        if(!password){
+          errorEl.textContent = 'Enter your admin password.';
+          errorEl.style.display = 'block';
+          return;
+        }
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Checking…';
+
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        const { error } = await supabaseClient.auth.signInWithPassword({
+          email: session.user.email, password
+        });
+
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Confirm';
+
+        if(error){
+          errorEl.textContent = 'Incorrect password.';
+          errorEl.style.display = 'block';
+          return;
+        }
+        cleanup(true);
+      }
+      function onCancel(){ cleanup(false); }
+      function onKeydown(e){ if(e.key === 'Enter') onConfirm(); if(e.key === 'Escape') onCancel(); }
+
+      confirmBtn.addEventListener('click', onConfirm);
+      cancelBtn.addEventListener('click', onCancel);
+      input.addEventListener('keydown', onKeydown);
+    });
+  }
+
+  // ---------- Shared delete-profile handler (customers + workers) ----------
+  function attachDeleteHandlers(panel){
+    panel.querySelectorAll('[data-delete-user]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const name = btn.dataset.deleteName;
+        if(!confirm(`Permanently delete ${name}'s entire account? This removes all their profiles, bookings, and history. They CAN sign up again later, but as a brand new account requiring fresh verification. This cannot be undone.`)){
+          return;
+        }
+
+        const confirmed = await confirmAdminPassword(
+          'Confirm deletion',
+          `Re-enter your admin password to permanently delete ${name}'s account.`
+        );
+        if(!confirmed) return;
+
+        const { error } = await supabaseClient.rpc('admin_delete_account', {
+          p_profile_id: btn.dataset.deleteUser
+        });
+        if(error){ alert('Could not delete: ' + error.message); return; }
+
+        alert(name + '\'s account has been deleted.');
         await loadCustomers();
         await loadWorkers();
       });
