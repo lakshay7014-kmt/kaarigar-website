@@ -175,9 +175,12 @@
 </head>
 <body>
 
-<header>
-  <h1>🛡️ Kaarigar Admin</h1>
-  <p>Manage customers, workers, bookings & complaints</p>
+<header style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+  <div>
+    <h1>🛡️ Kaarigar Admin</h1>
+    <p>Manage customers, workers, bookings & complaints</p>
+  </div>
+  <button id="logoutBtn" style="display:none;background:none;border:1px solid rgba(250,246,236,0.4);color:var(--paper);padding:9px 16px;border-radius:7px;font-weight:600;font-size:0.85rem;cursor:pointer;">Log out</button>
 </header>
 
 <div class="content" id="mainContent">
@@ -1024,6 +1027,8 @@
   }
 
   async function init(){
+    document.getElementById('logoutBtn').style.display = 'none';
+
     if(!BACKEND_READY){
       renderGate('<h2>Backend not connected</h2><p>Add your Supabase URL & key at the top of admin.html.</p>');
       return;
@@ -1037,15 +1042,29 @@
 
     const { data: isAdmin, error } = await supabaseClient.rpc('is_admin');
     if(error || !isAdmin){
-      renderGate('<h2>Not authorized</h2><p>This account (' + session.user.email + ') does not have admin access.</p>');
+      renderGate('<h2>Not authorized</h2><p>This account (' + session.user.email + ') does not have admin access.</p><button class="btn" id="switchAccountBtn" style="margin-top:14px;">Log out and try another account</button>');
+      const switchBtn = document.getElementById('switchAccountBtn');
+      if(switchBtn) switchBtn.addEventListener('click', async () => {
+        await supabaseClient.auth.signOut();
+        init();
+      });
       return;
     }
 
-    // Authorized — show the tabbed app and load the first tab.
+    // Authorized — show the tabbed app, the logout button, and load the first tab.
     mainContent.style.display = 'none';
     adminApp.style.display = '';
+    document.getElementById('logoutBtn').style.display = '';
     await loadStats();
   }
+
+  document.getElementById('logoutBtn').addEventListener('click', async () => {
+    if(!confirm('Log out of the admin panel?')) return;
+    await supabaseClient.auth.signOut();
+    adminApp.style.display = 'none';
+    mainContent.style.display = '';
+    init();
+  });
 
   init();
 })();
