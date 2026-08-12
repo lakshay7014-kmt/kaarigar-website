@@ -1035,6 +1035,16 @@
     }
 
     const { data: { session } } = await supabaseClient.auth.getSession();
+
+    // If Google just redirected back here, the URL has a #access_token=...
+    // fragment. Supabase has already read it into the session by now —
+    // strip it from the address bar so it can never sit in browser
+    // history for "Back" to revisit (that stale/expired token confusing
+    // the client on restore is what was causing the false "logout").
+    if(window.location.hash.includes('access_token')){
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+
     if(!session){
       renderLoginGate();
       return;

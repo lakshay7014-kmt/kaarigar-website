@@ -1014,6 +1014,11 @@
 
     if(BACKEND_READY){
       supabaseClient.auth.getSession().then(({ data }) => {
+        // Same cleanup as admin.html — strip any leftover #access_token=...
+        // fragment so "Back" can never revisit a stale/expired token URL.
+        if(window.location.hash.includes('access_token')){
+          history.replaceState(null, '', window.location.pathname + window.location.search);
+        }
         if(data.session) handleSession(data.session);
       });
       supabaseClient.auth.onAuthStateChange((event, session) => {
