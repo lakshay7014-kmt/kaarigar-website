@@ -937,6 +937,16 @@
     // ---------- Handle the return trip from Google (or an existing session) ----------
     async function handleSession(session){
       if(adminLoginInProgress) return; // admin flow is handling its own redirect
+
+      // If this is an admin session (e.g. landed here via browser "Back"
+      // from admin.html), don't drag them into the customer/worker
+      // role-selection flow — just send them straight back to the panel.
+      const { data: isAdminAccount } = await supabaseClient.rpc('is_admin');
+      if(isAdminAccount){
+        window.location.href = 'admin.html';
+        return;
+      }
+
       pendingSession = session;
 
       const { data: profiles, error } = await supabaseClient

@@ -1046,20 +1046,7 @@
     }
 
     if(!session){
-      // Diagnostic: show exactly what's (or isn't) in storage, so we can
-      // see the real cause instead of guessing again.
-      let storageKeys = [];
-      try{
-        storageKeys = Object.keys(localStorage).filter(k => k.startsWith('sb-'));
-      } catch(e){ storageKeys = ['(localStorage threw: ' + e.message + ')']; }
-
       renderLoginGate();
-      const debugBox = document.createElement('div');
-      debugBox.style.cssText = 'max-width:420px;margin:20px auto 0;padding:12px 14px;background:#fff3cd;border:1px solid #e0c068;border-radius:8px;font-size:0.78rem;color:#5a4a1a;text-align:left;word-break:break-all;';
-      debugBox.innerHTML = '<strong>Debug info</strong> (screenshot this):<br>' +
-        'Supabase auth keys in storage: ' + (storageKeys.length ? storageKeys.join(', ') : 'NONE FOUND') + '<br>' +
-        'URL: ' + window.location.href;
-      document.querySelector('.gate').appendChild(debugBox);
       return;
     }
 
