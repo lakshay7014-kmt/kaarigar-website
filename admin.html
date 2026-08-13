@@ -879,14 +879,7 @@
     mainContent.innerHTML = `
       <div class="gate">
         <h2>Admin sign in</h2>
-        <p>Sign in with the Google account that has admin access.</p>
-        <button class="btn" id="signInBtn">Continue with Google</button>
-
-        <div style="display:flex;align-items:center;gap:12px;margin:26px 0;">
-          <div style="flex:1;height:1px;background:var(--line);"></div>
-          <span class="mono" style="color:var(--ink-soft);">OR</span>
-          <div style="flex:1;height:1px;background:var(--line);"></div>
-        </div>
+        <p>Enter your admin credentials to continue.</p>
 
         <form id="adminLoginForm" style="text-align:left;">
           <div style="margin-bottom:14px;">
@@ -902,8 +895,6 @@
         </form>
       </div>
     `;
-
-    document.getElementById('signInBtn').addEventListener('click', signIn);
 
     document.getElementById('adminLoginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
